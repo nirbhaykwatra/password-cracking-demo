@@ -2,7 +2,7 @@
 
 This is a web app which demonstrates the concepts involved in password storage as well as practical examples of password cracking.
 
-## Lesson Breakdown
+## Demo Breakdown
 
 1. What is a password? Why do we need them?
 2. How are passwords stored?
