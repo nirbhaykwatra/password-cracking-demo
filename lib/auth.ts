@@ -23,53 +23,28 @@ const JWT_EXPIRATION = '7d' // 7 days
 // Token refresh threshold (refresh if less than this time left)
 const REFRESH_THRESHOLD = 24 * 60 * 60 // 24 hours in seconds
 
-export async function hashPassword(password: string, securityStage: string): Promise<string> {
-    switch (securityStage) {
-        case 'plain-text':
-            return password;
-        case 'hashed':
-            return cryptoHash('md5', password, 'hex');
-        case 'salted': {
-            const salt = randomBytes(16).toString('hex');
-            const hashed = cryptoHash('sha256', salt + password, 'hex');
-            return `${salt}:${hashed}`;
-        }
-        case 'full-security':
-            return await hash(password, 10);
-        default:
-            throw new Error('Invalid security stage');
-    }
+// TODO: Create different hashing, verification, session and user auth functions for all the different security stages
+
+export async function hashPassword(password: string): Promise<string> {
+    return await hash(password, 10);
 }
 
-export async function verifyPassword(password: string, storedPassword: string, securityStage: string): Promise<boolean> {
-    switch (securityStage) {
-        case 'plain-text':
-            return password === storedPassword;
-        case 'hashed':
-            return cryptoHash('md5', password, 'hex') === storedPassword;
-        case 'salted': {
-            const [salt, storedHash] = storedPassword.split(':');
-            return cryptoHash('sha256', salt + password, 'hex') === storedHash;
-        }
-        case 'full-security':
-            return await compare(password, storedPassword);
-        default:
-            throw new Error('Invalid security stage');
-    }
+export async function verifyPassword(password: string, storedPassword: string): Promise<boolean> {
+    return await compare(password, storedPassword);
 }
 
-export async function createUser(name: string, email: string, password: string, securityStage: string){
+export async function createUser(name: string, email: string, password: string){
 
-    const hashedPassword = await hashPassword(password,  securityStage);
+    const hashedPassword = await hashPassword(password);
 
-    const [newUser] = await db.insert(users).values({
+/*    const [newUser] = await db.insert(users).values({
         name,
         email,
         password: hashedPassword,
-        securityStage
     }).returning({ id: users.id });
 
-    return { id: newUser.id , name, email, securityStage }
+    return { id: newUser.id , name, email }*/
+    return { id: 0 };
 }
 
 // Generate a JWT token

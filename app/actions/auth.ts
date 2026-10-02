@@ -58,7 +58,7 @@ export const signIn = async (prevState: ActionResponse | null, formData: FormDat
         }
 
         // Verify Password
-        const verified = await verifyPassword(data.password, user.password, user.securityStage)
+        const verified = await verifyPassword(data.password, user.password)
         if (!verified) {
             return {
                 success: false,
@@ -111,7 +111,7 @@ export const signUp = async (prevState: ActionResponse | null, formData: FormDat
             }
         }
 
-        const user = await createUser(data.username, data.email, data.password, data.securityStage);
+        const user = await createUser(data.username, data.email, data.password);
         if (!user){
             return {
                 success: false,
