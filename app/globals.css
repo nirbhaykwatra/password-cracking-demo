@@ -1,10 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --brand: #e10600;
-  --brand-foreground: #ffffff;
+  --background: #f4f4f4;
+  --foreground: #424143;
+  --gu-red: #b82025; /* GU Red - Used at GU Vancouver */
+  --gu-maroon: #671215; /* GU Maroon - Used at GU Kelowna */
+  --gu-blue: #0055B7; /* GU Blue */
+  --ubc-blue: #002145; /* UBC Blue */
+  --gu-sec-peach: #c73944; /* GU Secondary Peach */
+  --gu-sec-pink: #f05064; /* GU Secondary Pink */
+}
+
+.dark {
+  --background: #111;
+  --foreground: #eee;
 }
 
 @theme inline {

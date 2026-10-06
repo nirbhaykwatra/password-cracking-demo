@@ -2,15 +2,16 @@
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {ActionResponse, signInDemo } from "@/app/actions/auth";
+import {ActionResponse, signIn} from "@/app/actions/auth";
 import PrismaticBackground from "@/components/backgrounds/PrismaticBackground";
+import { GURedHeader, UBCBlueHeader } from "@/components/common/headers";
 import Link from "next/link";
 
-export default function DemoSignInPage() {
+export default function SignInPage() {
 
     const router = useRouter();
     const [state, formAction, isPending] = useActionState<ActionResponse | null, FormData>(
-        signInDemo,
+        signIn,
         null
     );
 
@@ -22,10 +23,9 @@ export default function DemoSignInPage() {
 
     return (
         <>
-            <PrismaticBackground />
-
+            <GURedHeader />
             <main className="flex min-h-screen items-center justify-center p-6 font-sans">
-                <div className="max-w-lg w-full rounded-[24px] border border-white/10 bg-black/40 p-10 text-center shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] backdrop-blur-xl">
+                <div className="max-w-lg w-full rounded-3xl border border-white/10 bg-black/40 p-10 text-center shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] backdrop-blur-xl">
 
                     <h1 className="mb-4 text-4xl font-extrabold tracking-tight text-white md:text-5xl">
                         Welcome back!

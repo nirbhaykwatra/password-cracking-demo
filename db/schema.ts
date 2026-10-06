@@ -6,8 +6,7 @@ import { relations } from 'drizzle-orm';
 
 export const instructors = pgTable('instructors', {
     id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    name: text('name').notNull(),
-    email: text('email').unique().notNull(),
+    username: text('username').unique().notNull(),
     password: text('password').notNull(), // always bcrypt
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });

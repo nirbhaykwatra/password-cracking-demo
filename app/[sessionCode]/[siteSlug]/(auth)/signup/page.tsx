@@ -2,15 +2,15 @@
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ActionResponse, signUp } from "@/app/actions/auth";
+import { ActionResponse, signUpDemo } from "@/app/actions/auth";
 import PrismaticBackground from "@/components/backgrounds/PrismaticBackground";
 import Link from "next/link";
 
-export default function SignUpPage() {
+export default function DemoSignUpPage() {
 
     const router = useRouter();
     const [state, formAction, isPending] = useActionState<ActionResponse | null, FormData>(
-        signUp,
+        signUpDemo,
         null
     );
 

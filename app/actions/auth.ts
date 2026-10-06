@@ -1,8 +1,8 @@
 "use server";
 import { z } from "zod";
 import { createUser, verifyPassword, createSession, deleteSession } from "@/lib/auth";
-import { getUserByEmail } from "@/lib/dal";
-import {redirect} from "next/navigation";
+import { getInstructorByUsername, getDemoUserByEmail } from "@/lib/dal";
+import { redirect } from "next/navigation";
 
 export type ActionResponse = {
     success: boolean
@@ -13,7 +13,7 @@ export type ActionResponse = {
 
 // Define Zod schema for signin validation
 const SignInSchema = z.object({
-    email: z.string().min(1, 'Email is required').email('Invalid email format'),
+    username: z.string().min(1, 'Username is required'),
     password: z.string().min(1, 'Password is required'),
 })
 
@@ -35,6 +35,58 @@ export const signIn = async (prevState: ActionResponse | null, formData: FormDat
     try {
         const data = {
             username: formData.get("username") as string,
+            password: formData.get("password") as string,
+        }
+
+        const validation = SignInSchema.safeParse(data)
+        if (!validation.success) {
+            return {
+                success: false,
+                message: "Invalid input",
+                errors: validation.error.flatten().fieldErrors,
+            }
+        }
+
+        const user = await getInstructorByUsername(data.username)
+        if (!user) {
+            return {
+                success: false,
+                message: "Invalid Username",
+                error: "Invalid Username"
+            }
+        }
+
+        // Verify Password
+        const verified = await verifyPassword(data.password, user.password)
+        if (!verified) {
+            return {
+                success: false,
+                message: "Invalid Password",
+                error: "Invalid Password"
+            }
+        }
+
+        await createSession(user.id);
+
+        return {
+            success: true,
+            message: "Signed In Successfully"
+        }
+    }
+    catch (error) {
+        console.log(error);
+        return {
+            success: false,
+            message: "An error occurred",
+            error: "An error occurred"
+        }
+    }
+}
+
+export const signInDemo = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
+    try {
+        const data = {
+            username: formData.get("username") as string,
             email: formData.get("email") as string,
             password: formData.get("password") as string,
         }
@@ -48,7 +100,7 @@ export const signIn = async (prevState: ActionResponse | null, formData: FormDat
             }
         }
 
-        const user = await getUserByEmail(data.email)
+        const user = await getDemoUserByEmail(data.email)
         if (!user) {
             return {
                 success: false,
@@ -84,7 +136,7 @@ export const signIn = async (prevState: ActionResponse | null, formData: FormDat
     }
 }
 
-export const signUp = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
+export const signUpDemo = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
     try {
         const data = {
             username: formData.get("username") as string,
@@ -102,7 +154,7 @@ export const signUp = async (prevState: ActionResponse | null, formData: FormDat
             }
         }
 
-        const existingUser = await getUserByEmail(data.email)
+        const existingUser = await getDemoUserByEmail(data.email)
         if (existingUser){
             return {
                 success: false,
