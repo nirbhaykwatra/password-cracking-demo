@@ -3,8 +3,8 @@
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {ActionResponse, signIn} from "@/app/actions/auth";
-import PrismaticBackground from "@/components/backgrounds/PrismaticBackground";
-import { GURedHeader, UBCBlueHeader } from "@/components/common/headers";
+import { GURedHeader } from "@/components/common/headers";
+import { ThemeToggle } from "@/components/common/theme-toggle";
 import Link from "next/link";
 
 export default function SignInPage() {
@@ -25,12 +25,11 @@ export default function SignInPage() {
         <>
             <GURedHeader />
             <main className="flex min-h-screen items-center justify-center p-6 font-sans">
-                <div className="max-w-lg w-full rounded-3xl border border-white/10 bg-black/40 p-10 text-center shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] backdrop-blur-xl">
-
-                    <h1 className="mb-4 text-4xl font-extrabold tracking-tight text-white md:text-5xl">
-                        Welcome back!
-                    </h1>
-
+                {/* Sign In Box */}
+                <div className="max-w-lg w-full rounded-3xl border border-white/10 bg-(--color-background)/40 p-10 text-center shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] backdrop-blur-xl">
+                    <h2 className="mb-4 tracking-tight text-color-(--color-primary) md:text-5xl">
+                        Instructor Sign In
+                    </h2>
                     <form
                         action={formAction}
                         className="mt-8 flex flex-col gap-4 rounded-2xl"
@@ -44,7 +43,7 @@ export default function SignInPage() {
                         <div className="flex flex-col gap-1.5">
                             <label
                                 htmlFor="email"
-                                className="text-xs font-semibold uppercase tracking-wide text-foreground/ text-left"
+                                className="text-xs font-semibold uppercase tracking-wide text-(--color-foreground) text-left"
                             >
                                 Email
                             </label>
@@ -54,7 +53,7 @@ export default function SignInPage() {
                                 type="text"
                                 autoComplete="name"
                                 placeholder="scanlan@critrole.com"
-                                className="rounded-lg border border-black/10 bg-background px-3.5 py-2.5 text-sm text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-white/10"
+                                className="rounded-lg border border-black/10 bg-background px-3.5 py-2.5 text-sm text-(--color-foreground) outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-white/10"
                             />
                             {state?.errors?.email && (
                                 <p className="text-xs text-red-500">{state.errors.email[0]}</p>
@@ -65,7 +64,7 @@ export default function SignInPage() {
                             <div className="flex items-center justify-between">
                                 <label
                                     htmlFor="password"
-                                    className="text-xs font-semibold uppercase tracking-wide text-foreground/70 text-left"
+                                    className="text-xs font-semibold uppercase tracking-wide text-(--color-foreground) text-left"
                                 >
                                     Password
                                 </label>
@@ -82,7 +81,7 @@ export default function SignInPage() {
                                 type="password"
                                 autoComplete="current-password"
                                 placeholder="••••••••"
-                                className="rounded-lg border border-black/10 bg-background px-3.5 py-2.5 text-sm text-foreground outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-white/10"
+                                className="rounded-lg border border-black/10 bg-background px-3.5 py-2.5 text-sm text-(--color-foreground) outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-white/10"
                             />
                             {state?.errors?.password && (
                                 <p className="text-xs text-red-500">{state.errors.password[0]}</p>
@@ -93,14 +92,13 @@ export default function SignInPage() {
                         <button
                             type="submit"
                             disabled={isPending}
-                            className="rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-neutral-950 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(255,255,255,0.4)] active:translate-y-0">
+                            className="rounded-xl bg-(--color-background) px-7 py-3.5 text-sm text-(--color-primary-foreground) font-semibold shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(255,255,255,0.4)] hover:bg-(--color-primary) active:translate-y-0">
                             {isPending ? "Signing in…" : "Sign In"}
                         </button>
 
                     </form>
-
-
                 </div>
+
             </main>
         </>
     );

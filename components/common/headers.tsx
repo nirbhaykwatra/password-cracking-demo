@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export function GURedHeader() {
      return (
-         <header className="w-full bg-(--gu-red) px-4 sm:px-6 lg:px-8 absolute">
+         <header className="w-full bg-(--color-primary) px-4 sm:px-6 lg:px-8 absolute">
               <div className="mx-auto flex h-14 sm:h-16 max-w-7xl items-center justify-between gap-4">
                    <Image
                        src="/geeringup/GU Wordmark White.png"
@@ -36,7 +36,7 @@ export function GURedHeader() {
 
 export function UBCBlueHeader() {
      return (
-         <header className="w-full bg-[#002145] px-4 sm:px-6 lg:px-8">
+         <header className="w-full bg-(--color-ubc-primary) px-4 sm:px-6 lg:px-8">
               <div className="mx-auto flex h-14 sm:h-16 max-w-7xl items-center justify-between gap-4">
                    <Image
                        src="/geeringup/UBC_APSC_long_white.png"

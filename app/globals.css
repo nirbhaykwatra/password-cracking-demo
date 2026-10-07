@@ -1,29 +1,19 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
-:root {
-  --background: #f4f4f4;
-  --foreground: #424143;
-  --gu-red: #b82025; /* GU Red - Used at GU Vancouver */
-  --gu-maroon: #671215; /* GU Maroon - Used at GU Kelowna */
-  --gu-blue: #0055B7; /* GU Blue */
-  --ubc-blue: #002145; /* UBC Blue */
-  --gu-sec-peach: #c73944; /* GU Secondary Peach */
-  --gu-sec-pink: #f05064; /* GU Secondary Pink */
-}
-
-.dark {
-  --background: #111;
-  --foreground: #eee;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* 1. Raw brand palette: fixed values from the brand guide */
 @theme {
+  /* GU Branding */
+  --color-gu-red: #b82025;
+  --color-gu-maroon: #671215;
+  --color-peach: #c73944;
+  --color-sea-pink: #f05064;
+  --color-ubc-blue: #002145;
+  --color-gu-blue: #0055b7;
+  --color-charcoal: #424143;
+  --color-dark-grey: #6e6f72;
+  --color-chalk: #f4f4f4;
+
   /* Define individual glowing technicolor accent lights */
   --background-image-streak-pink: radial-gradient(circle at center, rgb(255 0 0) 0%, rgba(255, 0, 85, 0) 70%);
   --background-image-streak-purple: radial-gradient(circle at center, rgb(153 0 255 / 0.51) 0%, rgba(122, 0, 255, 0) 70%);
@@ -48,16 +38,78 @@
   }
 }
 
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* 2. Semantic tokens: swapped per mode */
+:root {
+  color-scheme: light;
+  --background: var(--color-chalk);
+  --surface: #ffffff;
+  --foreground: var(--color-charcoal);
+  --muted-foreground: var(--color-dark-grey);
+  --border: #dcdcde;
+  --primary: var(--color-gu-red);
+  --primary-foreground: var(--color-chalk);
+  --heading: var(--color-gu-red);
+  --accent: var(--color-sea-pink);
+  --ubc-primary: var(--color-ubc-blue);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.dark {
+  color-scheme: dark;
+  --background: #1f1e20;       /* derived: not in the guide */
+  --surface: #2a292b;          /* derived */
+  --foreground: var(--color-chalk);
+  --muted-foreground: #a9aaad; /* derived: Dark Grey is too dim on dark */
+  --border: #3d3c3f;           /* derived */
+}
+
+/* Kelowna location theme: maroon replaces red (set data-location on <html>) */
+[data-location="kelowna"] {
+  --primary: var(--color-gu-maroon);
+  --heading: var(--color-gu-maroon);
+}
+.dark[data-location="kelowna"] {
+  --heading: var(--color-sea-pink);
+}
+
+
+/* 3. Expose fonts and tokens as Tailwind utilities */
+@theme inline {
+  --font-heading: var(--font-lexend), system-ui, sans-serif;
+  --font-body: var(--font-plex), system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-ubc-primary: var(--ubc-primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-heading: var(--heading);
+  --color-accent: var(--accent);
+}
+
+/* 4. Base styles */
+@layer base {
+  /* Tailwind's default border colour is gray-200, so point it at our token */
+  *,
+  ::after,
+  ::before {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body), sans-serif;
+    font-weight: 400;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading), sans-serif;
+    color: var(--heading);
+  }
+  h1 { font-weight: 800; } /* display: ExtraBold */
+  h2 { font-weight: 700; } /* header: Bold */
+  h3, h4 { font-weight: 500; } /* subheader: Medium, two steps below Bold */
 }
