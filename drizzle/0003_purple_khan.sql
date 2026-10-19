@@ -1,0 +1,1 @@
+ALTER TABLE "class_sessions" ALTER COLUMN "code" SET DATA TYPE varchar;

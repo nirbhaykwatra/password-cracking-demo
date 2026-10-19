@@ -1,5 +1,5 @@
 
-import { pgTable, text, integer, timestamp, unique } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ─── Instructors ────────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ export const instructorsRelations = relations(instructors, ({ many }) => ({
 
 export const classSessions = pgTable('class_sessions', {
     id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    code: text('code').unique().notNull(), // e.g. "TIGER-42"
+    code: varchar('code').unique().notNull(),
     instructorId: integer('instructor_id').notNull().references(() => instructors.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });

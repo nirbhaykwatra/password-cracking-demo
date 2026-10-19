@@ -1,10 +1,10 @@
 import { db } from '@/db/';
-import { users } from '@/db/schema';
+import {instructors, users} from '@/db/schema';
 import { compare, hash } from 'bcrypt';
 import { cookies } from "next/headers";
 import * as jose from 'jose';
 import { cache } from 'react';
-import { hash as  cryptoHash, randomBytes } from 'node:crypto';
+import { hash as cryptoHash, randomBytes } from 'node:crypto';
 
 // JWT types
 interface JWTPayload {
@@ -31,6 +31,17 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, storedPassword: string): Promise<boolean> {
     return await compare(password, storedPassword);
+}
+
+export async function createInstructor(name: string, password: string) {
+    const hashedPassword = await hashPassword(password);
+
+    const [newInstructor] = await db.insert(instructors).values({
+        username: name,
+        password: hashedPassword
+    }).returning({ id: instructors.id });
+
+    return { id:  newInstructor.id, name };
 }
 
 export async function createUser(name: string, email: string, password: string){

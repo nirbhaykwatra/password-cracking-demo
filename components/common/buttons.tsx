@@ -17,7 +17,7 @@ export function ButtonPill({ label, href }: ButtonProps) {
 
 export function ButtonRounded({ label, href }: ButtonProps) {
     return (
-        <Link href={href} className="rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground transition hover:opacity-90">
+        <Link href={href} className="rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary transition hover:opacity-90">
             {label}
         </Link>
     )
