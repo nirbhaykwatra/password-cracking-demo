@@ -83,7 +83,9 @@ export const signIn = async (prevState: ActionResponse | null, formData: FormDat
     }
 }
 
-export const signInDemo = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
+//region Demo Sign In Actions
+
+export const signInShopZone = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
     try {
         const data = {
             username: formData.get("username") as string,
@@ -136,7 +138,117 @@ export const signInDemo = async (prevState: ActionResponse | null, formData: For
     }
 }
 
-export const signUpDemo = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
+export const signInFlixWatch = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
+    try {
+        const data = {
+            username: formData.get("username") as string,
+            email: formData.get("email") as string,
+            password: formData.get("password") as string,
+        }
+
+        const validation = SignInSchema.safeParse(data)
+        if (!validation.success) {
+            return {
+                success: false,
+                message: "Invalid input",
+                errors: validation.error.flatten().fieldErrors,
+            }
+        }
+
+        const user = await getDemoUserByEmail(data.email)
+        if (!user) {
+            return {
+                success: false,
+                message: "Invalid Email",
+                error: "Invalid Email"
+            }
+        }
+
+        // Verify Password
+        const verified = await verifyPassword(data.password, user.password)
+        if (!verified) {
+            return {
+                success: false,
+                message: "Invalid Password",
+                error: "Invalid Password"
+            }
+        }
+
+        await createSession(user.id);
+
+        return {
+            success: true,
+            message: "Signed In Successfully"
+        }
+    }
+    catch (error) {
+        console.log(error);
+        return {
+            success: false,
+            message: "An error occurred",
+            error: "An error occurred"
+        }
+    }
+}
+
+export const signInFMail = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
+    try {
+        const data = {
+            username: formData.get("username") as string,
+            email: formData.get("email") as string,
+            password: formData.get("password") as string,
+        }
+
+        const validation = SignInSchema.safeParse(data)
+        if (!validation.success) {
+            return {
+                success: false,
+                message: "Invalid input",
+                errors: validation.error.flatten().fieldErrors,
+            }
+        }
+
+        const user = await getDemoUserByEmail(data.email)
+        if (!user) {
+            return {
+                success: false,
+                message: "Invalid Email",
+                error: "Invalid Email"
+            }
+        }
+
+        // Verify Password
+        const verified = await verifyPassword(data.password, user.password)
+        if (!verified) {
+            return {
+                success: false,
+                message: "Invalid Password",
+                error: "Invalid Password"
+            }
+        }
+
+        await createSession(user.id);
+
+        return {
+            success: true,
+            message: "Signed In Successfully"
+        }
+    }
+    catch (error) {
+        console.log(error);
+        return {
+            success: false,
+            message: "An error occurred",
+            error: "An error occurred"
+        }
+    }
+}
+
+//endregion
+
+//region Demo Sign Up Actions
+
+export const signUpShopZone = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
     try {
         const data = {
             username: formData.get("username") as string,
@@ -188,6 +300,114 @@ export const signUpDemo = async (prevState: ActionResponse | null, formData: For
         }
     }
 }
+
+export const signUpFlixWatch = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
+    try {
+        const data = {
+            username: formData.get("username") as string,
+            email: formData.get("email") as string,
+            password: formData.get("password") as string,
+            confirmPassword: formData.get("confirm-password") as string,
+        }
+
+        const validation = SignUpSchema.safeParse(data)
+        if (!validation.success) {
+            return {
+                success: false,
+                message: "Invalid input",
+                errors: validation.error.flatten().fieldErrors,
+            }
+        }
+
+        const existingUser = await getDemoUserByEmail(data.email)
+        if (existingUser){
+            return {
+                success: false,
+                message: "Something went wrong",
+                error: "Something went wrong"
+            }
+        }
+
+        const user = await createUser(data.username, data.email, data.password);
+        if (!user){
+            return {
+                success: false,
+                message: "Try again",
+                error: "Account could not be created"
+            }
+        }
+
+        await createSession(user.id);
+
+        return {
+            success: true,
+            message: "Signed Up Successfully"
+        }
+    }
+    catch (error) {
+        console.log(error);
+        return {
+            success: false,
+            message: "An error occurred",
+            error: "An error occurred"
+        }
+    }
+}
+
+export const signUpFMail = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
+    try {
+        const data = {
+            username: formData.get("username") as string,
+            email: formData.get("email") as string,
+            password: formData.get("password") as string,
+            confirmPassword: formData.get("confirm-password") as string,
+        }
+
+        const validation = SignUpSchema.safeParse(data)
+        if (!validation.success) {
+            return {
+                success: false,
+                message: "Invalid input",
+                errors: validation.error.flatten().fieldErrors,
+            }
+        }
+
+        const existingUser = await getDemoUserByEmail(data.email)
+        if (existingUser){
+            return {
+                success: false,
+                message: "Something went wrong",
+                error: "Something went wrong"
+            }
+        }
+
+        const user = await createUser(data.username, data.email, data.password);
+        if (!user){
+            return {
+                success: false,
+                message: "Try again",
+                error: "Account could not be created"
+            }
+        }
+
+        await createSession(user.id);
+
+        return {
+            success: true,
+            message: "Signed Up Successfully"
+        }
+    }
+    catch (error) {
+        console.log(error);
+        return {
+            success: false,
+            message: "An error occurred",
+            error: "An error occurred"
+        }
+    }
+}
+
+//endregion
 
 export const signOut = async () => {
     try {

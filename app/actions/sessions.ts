@@ -1,8 +1,9 @@
 'use server';
 
-import { createNewClassSession, generateSessionCode, getCurrentInstructor } from "@/lib/dal";
+import {createNewClassSession, generateSessionCode, getCurrentInstructor, getSessionByCode} from "@/lib/dal";
 import { ActionResponse } from "@/app/actions/auth"
 import postgres from "postgres";
+import {redirect} from "next/navigation";
 
 export const createNewSession = async (prevState: ActionResponse | null): Promise<ActionResponse> => {
     const instructor = await getCurrentInstructor();
@@ -37,4 +38,19 @@ export const createNewSession = async (prevState: ActionResponse | null): Promis
 
     // Return success data directly to the client component
     return { success: true, message: `Session created successfully with code ${session?.code}` };
+}
+
+export const joinSession = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
+
+    const joinCode = formData.get("sessionCode")?.toString();
+    if (!joinCode) {
+        return { success: false, message: "Session code is required" };
+    }
+
+    const session = await getSessionByCode(joinCode);
+    if (!session) {
+        return { success: false, message: "Session code is invalid" };
+    }
+
+    redirect(`/${session.code}/dashboard`);
 }

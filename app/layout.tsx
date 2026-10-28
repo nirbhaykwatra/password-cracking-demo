@@ -3,6 +3,7 @@ import { Lexend, IBM_Plex_Sans } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme/theme-provider'
 import { ThemeToggle } from '@/components/common/theme-toggle'
 import './globals.css'
+import {GURedHeader} from "@/components/common/headers";
 
 const lexend = Lexend({
   subsets: ['latin'],
@@ -30,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           data-location="vancouver" // switch to "kelowna" for the maroon variant
           suppressHydrationWarning
       >
-      <body className="min-h-dvh antialiased">
+      <body className="h-dvh antialiased">
       <ThemeProvider>
         {children}
         <div className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 print:hidden">

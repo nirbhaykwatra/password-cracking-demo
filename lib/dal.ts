@@ -1,7 +1,7 @@
-import { sql, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { cache } from 'react';
 import { db } from '@/db/';
-import {classSessions, instructors, users} from '@/db/schema';
+import {classSessions, instructors} from '@/db/schema';
 import { getSession } from '@/lib/auth';
 
 export const getCurrentInstructor = cache(async () => {
@@ -24,8 +24,16 @@ export const getCurrentInstructor = cache(async () => {
     }
 });
 
-export async function getUsers() {
-  return sql`SELECT * FROM ${users}`;
+export async function getUsersBySession(sessionId: number) {
+  return db.query.users.findMany({
+    where: (users, { eq }) => eq(users.sessionId, sessionId)
+  });
+}
+
+export async function getSessionByCode(code: string) {
+  return db.query.classSessions.findFirst({
+    where: (classSessions, { eq }) => eq(classSessions.code, code)
+  });
 }
 
 export async function getInstructorByUsername(username: string) {

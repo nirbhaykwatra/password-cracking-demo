@@ -6,7 +6,6 @@ import { ActionResponse, signIn } from "@/app/actions/auth";
 import Link from "next/link";
 
 export default function SignInPage() {
-
     const router = useRouter();
     const [state, formAction, isPending] = useActionState<ActionResponse | null, FormData>(
         signIn,

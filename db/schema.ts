@@ -68,3 +68,7 @@ export const usersRelations = relations(users, ({ one }) => ({
         references: [sites.id],
     }),
 }));
+
+// ─── Site Data ───────────────────────────────────────────────────────────────────
+
+// TODO: Modify database design to accommodate creation of new websites with their unique data (multi tenant schema)
