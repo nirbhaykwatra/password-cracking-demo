@@ -1,9 +1,16 @@
+import PasswordCracker from "@/components/PasswordCracker";
+import { getDemoUsernames, getDemoWebsites, requireOwnedSession } from "@/lib/dal";
+import { getConfig } from "@/lib/store";
 
-// Add two sections to this page: A password cracking tool section and a section with readouts of the session database
-// The session database tables will simply collate the users with a session id matching the current session, with a
-// different table for each of the 3 test websites.
-export default function SessionAdminPasswordToolPage(){
+export default async function SessionAdminPasswordToolPage({ params }: { params: Promise<{sessionCode: string}> }){
+    const { sessionCode } = await params;
+
+    await requireOwnedSession(sessionCode);
+
+    const usernames = await getDemoUsernames(sessionCode);
+    const websites = await getDemoWebsites();
+
     return (
-        <></>
+        <PasswordCracker usernames={usernames} websites={websites} initialConfig={getConfig(sessionCode)} />
     );
 }

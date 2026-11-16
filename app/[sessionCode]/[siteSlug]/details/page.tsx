@@ -1,25 +1,34 @@
-export default async function DemoDetailsPage({ params }: { params: Promise<{ siteSlug: string }> }) {
-    const { siteSlug } = await params;
+import type { users } from "@/db/schema";
+import { requireDemoUser } from "@/lib/dal";
+
+type DemoUser = typeof users.$inferSelect;
+
+const cardLast4 = (u: DemoUser) => u.creditCard.replace(/\D/g, "").slice(-4);
+const cardExpiry = (u: DemoUser) => `${String(u.cardExpMonth).padStart(2, "0")}/${String(u.cardExpYear).slice(-2)}`;
+
+export default async function DemoDetailsPage({ params }: { params: Promise<{ sessionCode: string, siteSlug: string }> }) {
+    const { sessionCode, siteSlug } = await params;
+    const user = await requireDemoUser(sessionCode, siteSlug);
 
     switch (siteSlug) {
         case "flixwatch":
             return (
                 <div>
-                    <FlixWatchBilling />
+                    <FlixWatchBilling user={user} />
                 </div>
             );
 
         case "fmail":
             return (
                 <div>
-                    <FMailSecurity />
+                    <FMailSecurity user={user} />
                 </div>
             );
 
         case "shopzone":
             return (
                 <div>
-                    <ShopZoneAccount />
+                    <ShopZoneAccount user={user} />
                 </div>
             );
 
@@ -42,7 +51,7 @@ const orders = [
     { id: "SZ-204-7712-0063", date: "Sep 30, 2026", total: "129.99", status: "Delivered" },
 ];
 
-function ShopZoneAccount() {
+function ShopZoneAccount({ user }: { user: DemoUser }) {
     return (
         <div className="min-h-screen bg-[#eaeded] text-[#0f1111]">
             <header className="bg-[#131921] px-4 py-3 text-2xl font-bold text-white">
@@ -57,11 +66,9 @@ function ShopZoneAccount() {
                     <h2 className="mb-3 text-lg font-bold">Login &amp; security</h2>
                     <dl className="grid grid-cols-[120px_1fr] gap-y-2 text-sm">
                         <dt className="text-[#565959]">Name</dt>
-                        <dd>Jamie Fakeperson</dd>
+                        <dd>{user.name}</dd>
                         <dt className="text-[#565959]">Email</dt>
-                        <dd>jamie.fakeperson@example-mail.test</dd>
-                        <dt className="text-[#565959]">Phone</dt>
-                        <dd>(555) 010-0199</dd>
+                        <dd>{user.email}</dd>
                         <dt className="text-[#565959]">Password</dt>
                         <dd>••••••••••</dd>
                     </dl>
@@ -79,13 +86,13 @@ function ShopZoneAccount() {
                 VISA
               </span>
                             <div className="text-sm">
-                                <p className="font-medium">Visa ending in 0000</p>
-                                <p className="text-[#565959]">Expires 01/30 · Demo card — not a real number</p>
+                                <p className="font-medium">Card ending in {cardLast4(user)}</p>
+                                <p className="text-[#565959]">Expires {cardExpiry(user)} · CVC {user.cardCvc} · Demo card — not a real number</p>
                             </div>
                         </div>
                         <span className="rounded bg-[#f0f2f2] px-2 py-1 text-xs font-medium text-[#565959]">Default</span>
                     </div>
-                    <p className="mt-2 text-xs text-[#565959]">Card number on file: 0000 0000 0000 0000 (placeholder)</p>
+                    <p className="mt-2 text-xs text-[#565959]">Card number on file: {user.creditCard}</p>
                     <button className="mt-3 rounded-lg border border-[#d5d9d9] bg-gradient-to-b from-[#f7fafa] to-[#e7eaea] px-4 py-1.5 text-xs shadow-sm hover:from-[#e7eaea]">
                         Add a payment method
                     </button>
@@ -95,10 +102,11 @@ function ShopZoneAccount() {
                 <section className="rounded-lg bg-white p-5 shadow-sm">
                     <h2 className="mb-3 text-lg font-bold">Billing address</h2>
                     <address className="text-sm not-italic leading-6">
-                        Jamie Fakeperson<br />
-                        123 Placeholder Street<br />
-                        Springfield, ON A1A 1A1<br />
-                        Canada (fictional address)
+                        {user.name}<br />
+                        {user.addressLine1}<br />
+                        {user.addressLine2 && <>{user.addressLine2}<br /></>}
+                        {user.addressCity}, {user.addressState} {user.addressZip}<br />
+                        {user.addressCountry}
                     </address>
                 </section>
 
@@ -133,7 +141,7 @@ const invoices = [
     { date: "Aug 1, 2026", amount: "16.99", status: "Paid" },
 ];
 
-function FlixWatchBilling() {
+function FlixWatchBilling({ user }: { user: DemoUser }) {
     return (
         <div className="min-h-screen bg-black text-white">
             <header className="px-6 py-5 md:px-14">
@@ -148,9 +156,9 @@ function FlixWatchBilling() {
                     <h2 className="mb-3 text-sm uppercase tracking-wide text-[#b3b3b3]">Account</h2>
                     <dl className="grid grid-cols-[140px_1fr] gap-y-2 text-sm">
                         <dt className="text-[#8c8c8c]">Name on account</dt>
-                        <dd>Taylor Fakeview</dd>
+                        <dd>{user.name}</dd>
                         <dt className="text-[#8c8c8c]">Email</dt>
-                        <dd>taylor.fakeview@example-mail.test</dd>
+                        <dd>{user.email}</dd>
                         <dt className="text-[#8c8c8c]">Member since</dt>
                         <dd>March 2024 (demo)</dd>
                     </dl>
@@ -179,12 +187,12 @@ function FlixWatchBilling() {
                 MC
               </span>
                             <div className="text-sm">
-                                <p className="font-medium">Mastercard ending in 0000</p>
-                                <p className="text-[#8c8c8c]">Expires 01/30 · Demo card — not a real number</p>
+                                <p className="font-medium">Mastercard ending in {cardLast4(user)}</p>
+                                <p className="text-[#8c8c8c]">Expires {cardExpiry(user)} · CVC {user.cardCvc} · Demo card — not a real number</p>
                             </div>
                         </div>
                     </div>
-                    <p className="mt-2 text-xs text-[#8c8c8c]">Card number on file: 0000 0000 0000 0000 (placeholder)</p>
+                    <p className="mt-2 text-xs text-[#8c8c8c]">Card number on file: {user.creditCard}</p>
                     <button className="mt-3 rounded bg-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/30">
                         Update payment method
                     </button>
@@ -219,7 +227,7 @@ const activity = [
     { device: "Safari on iPad", location: "Burnaby, BC (demo)", time: "Oct 24, 6:55 PM" },
 ];
 
-function FMailSecurity() {
+function FMailSecurity({ user }: { user: DemoUser }) {
     return (
         <div className="min-h-screen bg-[#f6f8fc] text-[#1f1f1f]">
             <header className="flex items-center gap-1 px-4 py-3 text-xl text-[#444746]">
@@ -234,13 +242,11 @@ function FMailSecurity() {
                     <h2 className="mb-3 text-lg font-medium">Account info</h2>
                     <dl className="grid grid-cols-[160px_1fr] gap-y-2 text-sm">
                         <dt className="text-[#5f6368]">Name</dt>
-                        <dd>Robin Fakewood</dd>
+                        <dd>{user.name}</dd>
                         <dt className="text-[#5f6368]">Primary email</dt>
-                        <dd>robin.fakewood@fmail-demo.test</dd>
+                        <dd>{user.email}</dd>
                         <dt className="text-[#5f6368]">Recovery email</dt>
-                        <dd>r.fakewood.backup@example-mail.test</dd>
-                        <dt className="text-[#5f6368]">Recovery phone</dt>
-                        <dd>(555) 010-0142</dd>
+                        <dd>{user.email}</dd>
                     </dl>
                 </section>
 

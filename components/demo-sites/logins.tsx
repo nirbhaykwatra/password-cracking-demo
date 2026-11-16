@@ -241,7 +241,7 @@ export function FMailLogin({ sessionCode, siteSlug }: { sessionCode: string, sit
                             </div>
 
                             <div className="mt-10 flex items-center justify-between">
-                                <a href="/fmail/signup" className="rounded px-2 py-2 text-sm font-medium text-[#0b57d0] hover:bg-[#f0f4f9]">
+                                <a href={`/${sessionCode}/${siteSlug}/signup`} className="rounded px-2 py-2 text-sm font-medium text-[#0b57d0] hover:bg-[#f0f4f9]">
                                     Create account
                                 </a>
                                 <button

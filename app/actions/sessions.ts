@@ -5,6 +5,14 @@ import { ActionResponse } from "@/app/actions/auth"
 import postgres from "postgres";
 import {redirect} from "next/navigation";
 
+// Unique-constraint violation (23505), whether raw or wrapped in DrizzleQueryError.
+function isUniqueViolation(error: unknown): boolean {
+    const cause = error instanceof Error ? error.cause : undefined;
+    return [error, cause].some(
+        (e) => e instanceof postgres.PostgresError && e.code === "23505"
+    );
+}
+
 export const createNewSession = async (prevState: ActionResponse | null): Promise<ActionResponse> => {
     const instructor = await getCurrentInstructor();
     if  (!instructor) {
@@ -24,8 +32,7 @@ export const createNewSession = async (prevState: ActionResponse | null): Promis
             break;
 
         } catch (error) {
-            // Catch postgres-js Unique Constraint violation (23505)
-            if (error instanceof postgres.PostgresError && error.code === "23505") {
+            if (isUniqueViolation(error)) {
                 attempts++;
                 continue; // Try again with a new code
             }
@@ -36,8 +43,12 @@ export const createNewSession = async (prevState: ActionResponse | null): Promis
         }
     }
 
+    if (!session) {
+        return { success: false, message: "Could not generate a unique session code. Please try again.", error: "Could not generate a unique session code." };
+    }
+
     // Return success data directly to the client component
-    return { success: true, message: `Session created successfully with code ${session?.code}` };
+    return { success: true, message: `Session created successfully with code ${session.code}` };
 }
 
 export const joinSession = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {

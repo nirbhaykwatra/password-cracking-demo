@@ -4,8 +4,8 @@ import { compare, hash } from 'bcrypt';
 import { cookies } from "next/headers";
 import * as jose from 'jose';
 import { cache } from 'react';
-import {createHash, hash as cryptoHash, randomBytes} from 'node:crypto';
-import {integer, text} from "drizzle-orm/pg-core";
+import { createHash } from 'node:crypto';
+import {normalizeEmail} from "@/lib/normalize";
 
 // JWT types
 interface JWTPayload {
@@ -13,16 +13,28 @@ interface JWTPayload {
     [key: string]: string | number | boolean | null | undefined
 }
 
-// Secret key for JWT signing (in a real app, use an environment variable)
-const JWT_SECRET = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'your-secret-key-min-32-chars-long!!!'
-)
+// Who a token was issued for. A token for one audience is rejected by the other.
+type TokenAudience = 'instructor' | 'student'
+
+/* Read lazily so a missing secret doesn't break `next build`, only the first real use. */
+let jwtSecret: Uint8Array | undefined
+function getJwtSecret(): Uint8Array {
+    if (!jwtSecret) {
+        const secret = process.env.JWT_SECRET
+        if (!secret || secret.length < 32) {
+            throw new Error('JWT_SECRET must be set to a random string of at least 32 characters')
+        }
+        jwtSecret = new TextEncoder().encode(secret)
+    }
+    return jwtSecret
+}
 
 // JWT expiration time
 const JWT_EXPIRATION = '7d' // 7 days
 
-// Token refresh threshold (refresh if less than this time left)
-const REFRESH_THRESHOLD = 24 * 60 * 60 // 24 hours in seconds
+// One cookie per demo site, so signing in to one site doesn't sign you out of another.
+const DEMO_COOKIE_PREFIX = 'demo_auth_token_'
+const demoCookieName = (siteSlug: string) => `${DEMO_COOKIE_PREFIX}${siteSlug}`
 
 // TODO: Create different hashing, verification, session and user auth functions for all the different security stages
 
@@ -45,6 +57,29 @@ export async function verifyPlainTextPassword(password: string, storedPassword: 
     return password === storedPassword;
 }
 
+// How each demo site stores and checks passwords. Add a new security stage by adding an entry.
+type PasswordScheme = {
+    hash: (password: string) => Promise<string>
+    verify: (password: string, storedPassword: string) => Promise<boolean>
+}
+
+const PASSWORD_SCHEMES: Record<string, PasswordScheme> = {
+    shopzone: { hash: hashPassword, verify: verifyPassword },                       // bcrypt
+    flixwatch: { hash: md5Hash, verify: verifyMd5Password },                        // unsalted MD5
+    fmail: { hash: async (password) => password, verify: verifyPlainTextPassword }, // plain text
+}
+
+export async function hashPasswordForSite(siteSlug: string, password: string): Promise<string> {
+    const scheme = PASSWORD_SCHEMES[siteSlug]
+    if (!scheme) throw new Error(`Unknown site: ${siteSlug}`)
+    return scheme.hash(password)
+}
+
+export async function verifyPasswordForSite(siteSlug: string, password: string, storedPassword: string): Promise<boolean> {
+    const scheme = PASSWORD_SCHEMES[siteSlug]
+    return scheme ? scheme.verify(password, storedPassword) : false
+}
+
 export async function createInstructor(name: string, password: string) {
     const hashedPassword = await hashPassword(password);
 
@@ -56,122 +91,39 @@ export async function createInstructor(name: string, password: string) {
     return { id:  newInstructor.id, name };
 }
 
-export async function createFlixWatchUser(
-    name: string,
-    email: string,
-    password: string,
-    sessionId: number,
-    siteId: number,
-    creditCard: {
-        number: string,
-        exp_month: number,
-        exp_year: number,
-        cvc: string,
-    },
-    address: {
-        line1: string,
-        line2: string | null,
-        city: string,
-        state: string,
-        postal_code: string,
-        country: string,
-    }
-){
-
-    const hashedPassword = await md5Hash(password);
-
-    const [newUser] = await db.insert(users).values({
-        name,
-        email,
-        password: hashedPassword,
-        sessionId,
-        siteId,
-        creditCard: creditCard.number,
-        cardExpMonth: creditCard.exp_month,
-        cardExpYear: creditCard.exp_year,
-        cardCvc: creditCard.cvc,
-        addressLine1: address.line1,
-        addressLine2: address.line2,
-        addressCity: address.city,
-        addressState: address.state,
-        addressZip: address.postal_code,
-        addressCountry: address.country,
-    }).returning({ id: users.id });
-
-    return { id: newUser.id , name, email }
+export type DemoCreditCard = {
+    number: string
+    exp_month: number
+    exp_year: number
+    cvc: string
 }
 
-export async function createFMailUser(
-    name: string,
-    email: string,
-    password: string,
-    sessionId: number,
-    siteId: number,
-    creditCard: {
-        number: string,
-        exp_month: number,
-        exp_year: number,
-        cvc: string,
-    },
-    address: {
-        line1: string,
-        line2: string | null,
-        city: string,
-        state: string,
-        postal_code: string,
-        country: string,
-    }
-){
-
-    const [newUser] = await db.insert(users).values({
-        name,
-        email,
-        password,
-        sessionId,
-        siteId,
-        creditCard: creditCard.number,
-        cardExpMonth: creditCard.exp_month,
-        cardExpYear: creditCard.exp_year,
-        cardCvc: creditCard.cvc,
-        addressLine1: address.line1,
-        addressLine2: address.line2,
-        addressCity: address.city,
-        addressState: address.state,
-        addressZip: address.postal_code,
-        addressCountry: address.country,
-    }).returning({ id: users.id });
-
-    return { id: newUser.id , name, email }
+export type DemoAddress = {
+    line1: string
+    line2: string | null
+    city: string
+    state: string
+    postal_code: string
+    country: string
 }
 
-export async function createShopZoneUser(
-    name: string,
-    email: string,
-    password: string,
-    sessionId: number,
-    siteId: number,
-    creditCard: {
-        number: string,
-        exp_month: number,
-        exp_year: number,
-        cvc: string,
-    },
-    address: {
-        line1: string,
-        line2: string | null,
-        city: string,
-        state: string,
-        postal_code: string,
-        country: string,
-    }
-){
-
-    const hashedPassword = await hashPassword(password);
+export async function createDemoUser(input: {
+    siteSlug: string
+    name: string
+    email: string
+    password: string
+    sessionId: number
+    siteId: number
+    creditCard: DemoCreditCard
+    address: DemoAddress
+}) {
+    const { siteSlug, name, password, sessionId, siteId, creditCard, address } = input
+    const email = normalizeEmail(input.email)
 
     const [newUser] = await db.insert(users).values({
         name,
         email,
-        password: hashedPassword,
+        password: await hashPasswordForSite(siteSlug, password),
         sessionId,
         siteId,
         creditCard: creditCard.number,
@@ -184,24 +136,26 @@ export async function createShopZoneUser(
         addressState: address.state,
         addressZip: address.postal_code,
         addressCountry: address.country,
-    }).returning({ id: users.id });
+    }).returning({ id: users.id })
 
-    return { id: newUser.id , name, email }
+    return { id: newUser.id, name, email }
 }
 
 // Generate a JWT token
-export async function generateJWT(payload: JWTPayload) {
+export async function generateJWT(payload: JWTPayload, audience: TokenAudience) {
     return await new jose.SignJWT(payload)
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
+        .setAudience(audience)
         .setExpirationTime(JWT_EXPIRATION)
-        .sign(JWT_SECRET)
+        .sign(getJwtSecret())
 }
 
 // Verify a JWT token
-export async function verifyJWT(token: string): Promise<JWTPayload | null> {
+export async function verifyJWT(token: string, audience: TokenAudience): Promise<JWTPayload | null> {
+    const secret = getJwtSecret() // outside the try: a missing secret is a config error, not a bad token
     try {
-        const { payload } = await jose.jwtVerify(token, JWT_SECRET)
+        const { payload } = await jose.jwtVerify(token, secret, { audience })
         return payload as JWTPayload
     } catch (error) {
         console.error('JWT verification failed:', error)
@@ -209,30 +163,11 @@ export async function verifyJWT(token: string): Promise<JWTPayload | null> {
     }
 }
 
-// Check if token needs refresh
-export async function shouldRefreshToken(token: string): Promise<boolean> {
-    try {
-        const { payload } = await jose.jwtVerify(token, JWT_SECRET, {
-            clockTolerance: 15, // 15 seconds tolerance for clock skew
-        })
-
-        // Get expiration time
-        const exp = payload.exp as number
-        const now = Math.floor(Date.now() / 1000)
-
-        // If token expires within the threshold, refresh it
-        return exp - now < REFRESH_THRESHOLD
-    } catch {
-        // If verification fails, token is invalid or expired
-        return false
-    }
-}
-
 // Create a session using JWT
 export async function createSession(userId: number) {
     try {
         // Create JWT with user data
-        const token = await generateJWT({ userId })
+        const token = await generateJWT({ userId }, 'instructor')
 
         // Store JWT in a cookie
         const cookieStore = await cookies()
@@ -253,15 +188,15 @@ export async function createSession(userId: number) {
     }
 }
 
-export async function createDemoSession(userId: number, sessionId: number, siteId: number){
+export async function createDemoSession(userId: number, sessionId: number, siteId: number, siteSlug: string){
     try {
         // Create JWT with user data
-        const token = await generateJWT({ userId, sessionId, siteId })
+        const token = await generateJWT({ userId, sessionId, siteId }, 'student')
 
         // Store JWT in a cookie
         const cookieStore = await cookies()
         cookieStore.set({
-            name: 'demo_auth_token',
+            name: demoCookieName(siteSlug),
             value: token,
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -284,7 +219,7 @@ export const getSession = cache(async () => {
         const token = cookieStore.get('auth_token')?.value
 
         if (!token) return null
-        const payload = await verifyJWT(token)
+        const payload = await verifyJWT(token, 'instructor')
 
         return payload ? { userId: payload.userId } : null
     } catch (error) {
@@ -304,15 +239,16 @@ export const getSession = cache(async () => {
     }
 })
 
-export const getDemoSession = cache(async (sessionId: number, siteId: number) => {
+export const getDemoSession = cache(async (sessionId: number, siteId: number, siteSlug: string) => {
     try {
         const cookieStore = await cookies()
-        const token = cookieStore.get('demo_auth_token')?.value
+        const token = cookieStore.get(demoCookieName(siteSlug))?.value
 
         if (!token) return null
-        const payload = await verifyJWT(token)
+        const payload = await verifyJWT(token, 'student')
+        if (!payload || payload.sessionId !== sessionId || payload.siteId !== siteId) return null
 
-        return payload ? { userId: payload.userId, sessionId: payload.sessionId, siteId: payload.siteId } : null
+        return { userId: payload.userId, sessionId, siteId }
     } catch (error) {
         // Handle the specific prerendering error
         if (
@@ -330,8 +266,10 @@ export const getDemoSession = cache(async (sessionId: number, siteId: number) =>
     }
 })
 
-// Delete session by clearing the JWT cookie
 export async function deleteSession() {
     const cookieStore = await cookies()
     cookieStore.delete('auth_token')
+    for (const { name } of cookieStore.getAll()) {
+        if (name.startsWith(DEMO_COOKIE_PREFIX)) cookieStore.delete(name)
+    }
 }

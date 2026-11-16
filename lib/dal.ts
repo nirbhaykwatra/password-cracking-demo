@@ -1,8 +1,10 @@
-import { eq, and } from "drizzle-orm";
+import {eq, and, asc, min} from "drizzle-orm";
 import { cache } from 'react';
 import { db } from '@/db/';
-import {classSessions, instructors, users} from '@/db/schema';
-import {getDemoSession, getSession} from '@/lib/auth';
+import {classSessions, instructors, sites, users} from '@/db/schema';
+import {getDemoSession, getSession, verifyJWT} from '@/lib/auth';
+import { normalizeEmail, normalizeSessionCode } from '@/lib/normalize';
+import {notFound, redirect} from "next/navigation";
 
 const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -98,7 +100,7 @@ export const getCurrentDemoUser = cache(async(sessionCode: string, siteSlug: str
      if (!session || !site) {
         return null;
     }
-    const jwtSession = await getDemoSession(session.id, site.id);
+    const jwtSession = await getDemoSession(session.id, site.id, site.slug);
 
     if  (!jwtSession) {
         return null;
@@ -122,6 +124,24 @@ export const getCurrentDemoUser = cache(async(sessionCode: string, siteSlug: str
     }
 });
 
+// For student pages. Unknown session/site -> 404. Not logged in to this site -> its sign-in page.
+export async function requireDemoUser(sessionCode: string, siteSlug: string) {
+    const [session, site] = await Promise.all([
+        getSessionByCode(sessionCode),
+        getSiteBySlug(siteSlug),
+    ]);
+    if (!session || !site) {
+        notFound();
+    }
+
+    const user = await getCurrentDemoUser(sessionCode, siteSlug);
+    if (!user) {
+        redirect(`/${session.code}/${site.slug}/signin`);
+    }
+
+    return user;
+}
+
 export async function getUsersBySession(sessionId: number) {
   return db.query.users.findMany({
     where: (users, { eq }) => eq(users.sessionId, sessionId)
@@ -129,9 +149,34 @@ export async function getUsersBySession(sessionId: number) {
 }
 
 export async function getSessionByCode(code: string) {
+  const normalized = normalizeSessionCode(code);
   return db.query.classSessions.findFirst({
-    where: (classSessions, { eq }) => eq(classSessions.code, code)
+    where: (classSessions, { eq }) => eq(classSessions.code, normalized)
   });
+}
+
+// For instructor-only pages. Logged out -> /signin. Not the owner (or no such session) -> 404.
+export async function requireOwnedSession(sessionCode: string) {
+    const instructor = await getCurrentInstructor();
+    if (!instructor) {
+        redirect("/signin");
+    }
+
+    const session = await getSessionByCode(sessionCode);
+    if (!session || session.instructorId !== instructor.id) {
+        notFound();
+    }
+
+    return session;
+}
+
+// For API routes: the session if the logged-in instructor owns it, otherwise null.
+export async function getOwnedSession(sessionCode: string) {
+    const instructor = await getCurrentInstructor();
+    if (!instructor) return null;
+
+    const session = await getSessionByCode(sessionCode);
+    return session && session.instructorId === instructor.id ? session : null;
 }
 
 export async function getSiteBySlug(slug: string) {
@@ -152,29 +197,25 @@ export async function getInstructionSessionsByUserId(userId: number) {
     });
 }
 
-export async function getDemoUserByEmail(email: string) {
-    return db.query.users.findFirst({
-        where: (users, { eq }) => eq(users.email, email)
-    })
-}
-
 export async function getDemoUserBySiteSlug(email: string, siteSlug: string, sessionCode: string) {
-    const session = await db.query.classSessions.findFirst({
-        where: (classSessions, { eq }) => eq(classSessions.code, sessionCode)
-    })
+    const session = await getSessionByCode(sessionCode)
 
     if (session == null)
         return null;
 
-    const site = await db.query.sites.findFirst({
-        where: (sites, {eq}) => eq(sites.slug, siteSlug)
-    })
+    const site = await getSiteBySlug(siteSlug)
 
     if (site == null)
         return null;
 
-    return await db. query.users.findFirst({
-        where: (users, { and }) => and(eq(users.siteId, site.id), eq(users.email, email), eq(users.sessionId, session.id)),
+    const normalizedEmail = normalizeEmail(email);
+
+    return await db.query.users.findFirst({
+        where: (users, { and, eq }) => and(
+            eq(users.siteId, site.id),
+            eq(users.email, normalizedEmail),
+            eq(users.sessionId, session.id)
+        ),
     })
 }
 
@@ -206,6 +247,54 @@ export async function generateCreditCard(){
         cvc: generateThreeDigitCode(),
     }
 }
+
+export function generateDemoAddress(userKey: number | string) {
+    const baseSeed = typeof userKey === "number" ? userKey : hashString(userKey);
+    // Spread small sequential IDs (1, 2, 3...) across the seed space
+    const rng = createRng(Math.imul(baseSeed + 1, 2654435761));
+
+    const { city, state, zip } = pick(locations, rng);
+
+    return {
+        line1: `${Math.floor(rng() * 9900) + 100} ${pick(streetNames, rng)} ${pick(streetTypes, rng)}`,
+        line2: rng() < 0.3 ? `Apt ${Math.floor(rng() * 400) + 1}` : null,
+        city,
+        state,
+        postal_code: zip,
+        country: "US",
+    };
+}
+
+export type DemoUsername = {
+    name: string;
+    email: string;
+};
+
+export type DemoWebsite = {
+    name: string;
+    slug: string;
+};
+
+export const getDemoUsernames = async (sessionCode: string): Promise<DemoUsername[]> => {
+    const session = await getSessionByCode(sessionCode);
+    if (!session) return [];
+
+    // One row per email (the same student has an account on each demo site),
+    // ordered by when they first signed up.
+    return db
+        .select({ name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.sessionId, session.id))
+        .groupBy(users.email, users.name)
+        .orderBy(asc(min(users.id)));
+};
+
+export const getDemoWebsites = async (): Promise<DemoWebsite[]> => {
+    return db
+        .select({ name: sites.name, slug: sites.slug })
+        .from(sites)
+        .orderBy(asc(sites.id));
+};
 
 const generateFourDigitCode = (): string => {
     const num = Math.floor(Math.random() * 10000);
@@ -245,21 +334,4 @@ function hashString(value: string): number {
 
 function pick<T>(items: T[], rng: () => number): T {
     return items[Math.floor(rng() * items.length)];
-}
-
-export function generateDemoAddress(userKey: number | string) {
-    const baseSeed = typeof userKey === "number" ? userKey : hashString(userKey);
-    // Spread small sequential IDs (1, 2, 3...) across the seed space
-    const rng = createRng(Math.imul(baseSeed + 1, 2654435761));
-
-    const { city, state, zip } = pick(locations, rng);
-
-    return {
-        line1: `${Math.floor(rng() * 9900) + 100} ${pick(streetNames, rng)} ${pick(streetTypes, rng)}`,
-        line2: rng() < 0.3 ? `Apt ${Math.floor(rng() * 400) + 1}` : null,
-        city,
-        state,
-        postal_code: zip,
-        country: "US",
-    };
 }

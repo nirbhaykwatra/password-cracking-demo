@@ -1,28 +1,30 @@
 import { CategorySelect } from "@/components/demo-sites/ShopZone";
 import Link from "next/link";
+import { requireDemoUser } from "@/lib/dal";
 
 export default async function DemoDashboardPage({ params }: { params: Promise<{ sessionCode:string, siteSlug: string }> }) {
     const { sessionCode, siteSlug } = await params;
+    const user = await requireDemoUser(sessionCode, siteSlug);
 
     switch (siteSlug) {
         case "flixwatch":
             return (
                 <div>
-                    <FlixWatchDashboard sessionCode={sessionCode} siteSlug={siteSlug} />
+                    <FlixWatchDashboard sessionCode={sessionCode} siteSlug={siteSlug} userName={user.name} />
                 </div>
             );
 
         case "fmail":
             return (
                 <div>
-                    <FMailDashboard sessionCode={sessionCode} siteSlug={siteSlug} />
+                    <FMailDashboard sessionCode={sessionCode} siteSlug={siteSlug} userName={user.name} />
                 </div>
             );
 
         case "shopzone":
             return (
                 <div>
-                    <ShopZoneDashboard sessionCode={sessionCode} siteSlug={siteSlug} />
+                    <ShopZoneDashboard sessionCode={sessionCode} siteSlug={siteSlug} userName={user.name} />
                 </div>
             );
 
@@ -88,7 +90,7 @@ const rows: { title: string; items: { t: string; e: string }[] }[] = [
     },
 ];
 
-function FlixWatchDashboard({ sessionCode, siteSlug }: { sessionCode:string, siteSlug:string }) {
+function FlixWatchDashboard({ sessionCode, siteSlug, userName }: { sessionCode:string, siteSlug:string, userName:string }) {
     return (
         <div className="min-h-screen bg-[#141414] text-white">
             {/* Nav */}
@@ -104,7 +106,7 @@ function FlixWatchDashboard({ sessionCode, siteSlug }: { sessionCode:string, sit
                 <div className="ml-auto flex items-center gap-5 text-lg">
                     <button aria-label="Search">🔍</button>
                     <button aria-label="Notifications">🔔</button>
-                    <Link href={`/${sessionCode}/${siteSlug}/details`} className="grid h-8 w-8 place-items-center rounded bg-sky-600 text-sm font-bold">F</Link>
+                    <Link href={`/${sessionCode}/${siteSlug}/details`} className="grid h-8 w-8 place-items-center rounded bg-sky-600 text-sm font-bold">{userName.charAt(0).toUpperCase()}</Link>
                 </div>
             </header>
 
@@ -209,7 +211,7 @@ function Stars({ n }: { n: number }) {
     );
 }
 
-function ShopZoneDashboard({ sessionCode, siteSlug }: { sessionCode:string, siteSlug:string }) {
+function ShopZoneDashboard({ sessionCode, siteSlug, userName }: { sessionCode:string, siteSlug:string, userName:string }) {
     return (
         <div className="min-h-screen bg-[#eaeded] text-[#0f1111]">
             {/* Top bar */}
@@ -228,7 +230,7 @@ function ShopZoneDashboard({ sessionCode, siteSlug }: { sessionCode:string, site
                         <button className="bg-[#febd69] px-4 hover:bg-[#f3a847]" aria-label="Search">🔍</button>
                     </div>
                     <Link href={`/${sessionCode}/${siteSlug}/details`} className="hidden text-xs leading-tight sm:block">
-                        Hello, Demo User<br />
+                        Hello, {userName.split(" ")[0]}<br />
                         <span className="text-sm font-bold">Account &amp; Lists</span>
                     </Link>
                     <div className="hidden text-xs leading-tight sm:block">
@@ -355,7 +357,7 @@ const mails: { from: string; subject: string; preview: string; time: string; unr
     { from: "FMail Team", subject: "Tips for getting started", preview: "Get the most out of FMail with labels, filters, and keyboard shortcuts.", time: "Oct 22" },
 ];
 
-function FMailDashboard({ sessionCode, siteSlug }: { sessionCode:string, siteSlug:string }) {
+function FMailDashboard({ sessionCode, siteSlug, userName }: { sessionCode:string, siteSlug:string, userName:string }) {
     return (
         <div className="flex h-screen flex-col bg-[#f6f8fc] text-[#1f1f1f]">
             {/* Header */}
@@ -370,7 +372,7 @@ function FMailDashboard({ sessionCode, siteSlug }: { sessionCode:string, siteSlu
                 </div>
                 <Link href={`/${sessionCode}/${siteSlug}/details`} className="ml-auto flex items-center gap-2">
                     <button aria-label="Settings" className="hidden rounded-full p-2 hover:bg-[#e8eaed] sm:block">⚙️</button>
-                    <span className="grid h-8 w-8 place-items-center rounded-full bg-[#1a73e8] text-sm font-medium text-white">D</span>
+                    <span className="grid h-8 w-8 place-items-center rounded-full bg-[#1a73e8] text-sm font-medium text-white">{userName.charAt(0).toUpperCase()}</span>
                 </Link>
             </header>
 

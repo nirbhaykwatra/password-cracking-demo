@@ -1,7 +1,7 @@
 "use server";
 import { z } from "zod";
 import {
-    createFlixWatchUser, createShopZoneUser, createFMailUser, verifyPassword, createSession, deleteSession,
+    createDemoUser, verifyPassword, createSession, deleteSession,
     createDemoSession, verifyMd5Password, verifyPlainTextPassword
 } from "@/lib/auth";
 import {
@@ -61,20 +61,6 @@ const FMailSchemaSignUp = z.object({
         path: ['confirmPassword'],
     })
 
-// Define Zod schema for signup validation
-const SignUpSchema = z
-    .object({
-        username: z.string().min(1, 'Username is required').nonempty(),
-        email: z.string().min(1, 'Email is required').email('Invalid email format'),
-        password: z.string().min(8, 'Password must be at least 8 characters'),
-        confirmPassword: z.string().min(1, 'Please confirm your password'),
-    })
-    .refine((data) => data.password === data.confirmPassword, {
-        message: "Passwords don't match",
-        path: ['confirmPassword'],
-    })
-
-// TODO: Implement actions for instructor sign-in and individual sign-in and sign-up for each demo website (ShopZone, Poodle, FlixWatch), each website having a different password storage method.
 export const signIn = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
     try {
         const data = {
@@ -183,7 +169,7 @@ export const signInShopZone = async (prevState: ActionResponse | null, formData:
             }
         }
 
-        await createDemoSession(user.id, session.id, site.id);
+        await createDemoSession(user.id, session.id, site.id, site.slug);
 
         return {
             success: true,
@@ -255,7 +241,7 @@ export const signInFlixWatch = async (prevState: ActionResponse | null, formData
             }
         }
 
-        await createDemoSession(user.id, session.id, site.id);
+        await createDemoSession(user.id, session.id, site.id, site.slug);
 
         return {
             success: true,
@@ -329,7 +315,7 @@ export const signInFMail = async (prevState: ActionResponse | null, formData: Fo
             }
         }
 
-        await createDemoSession(user.id, session.id, site.id);
+        await createDemoSession(user.id, session.id, site.id, site.slug);
 
         return {
             success: true,
@@ -407,8 +393,10 @@ export const signUpShopZone = async (prevState: ActionResponse | null, formData:
         const creditCard = await generateCreditCard();
         const address = generateDemoAddress(data.email)
 
-        const user = await createShopZoneUser(
-            fmail.name, data.email, data.password, session.id, site.id, creditCard, address);
+        const user = await createDemoUser({
+                siteSlug: site.slug, name: fmail.name, email: data.email, password: data.password,
+                sessionId: session.id, siteId: site.id, creditCard, address,
+            });
         if (!user){
             return {
                 success: false,
@@ -417,7 +405,7 @@ export const signUpShopZone = async (prevState: ActionResponse | null, formData:
             }
         }
 
-        await createDemoSession(user.id, session.id, site.id);
+        await createDemoSession(user.id, session.id, site.id, site.slug);
 
         return {
             success: true,
@@ -452,6 +440,15 @@ export const signUpFlixWatch = async (prevState: ActionResponse | null, formData
             }
         }
 
+        const validation = DemoSchemaSignUp.safeParse(data)
+        if (!validation.success) {
+            return {
+                success: false,
+                message: "Invalid input",
+                errors: validation.error.flatten().fieldErrors,
+            }
+        }
+
         const existingUser = await getDemoUserBySiteSlug(data.email, 'flixwatch', data.sessionCode)
         if (existingUser){
             return {
@@ -482,8 +479,10 @@ export const signUpFlixWatch = async (prevState: ActionResponse | null, formData
         const creditCard = await generateCreditCard();
         const address = generateDemoAddress(data.email)
 
-        const user = await createFlixWatchUser(
-            fmail.name, data.email, data.password, session.id, site.id, creditCard, address);
+        const user = await createDemoUser({
+                siteSlug: site.slug, name: fmail.name, email: data.email, password: data.password,
+                sessionId: session.id, siteId: site.id, creditCard, address,
+            });
         if (!user){
             return {
                 success: false,
@@ -492,7 +491,7 @@ export const signUpFlixWatch = async (prevState: ActionResponse | null, formData
             }
         }
 
-        await createDemoSession(user.id, session.id, site.id);
+        await createDemoSession(user.id, session.id, site.id, site.slug);
 
         return {
             success: true,
@@ -562,8 +561,10 @@ export const signUpFMail = async (prevState: ActionResponse | null, formData: Fo
         const creditCard = await generateCreditCard();
         const address = generateDemoAddress(email)
 
-        const user = await createFMailUser(
-            username, email, data.password, session.id, site.id, creditCard, address);
+        const user = await createDemoUser({
+                siteSlug: site.slug, name: username, email, password: data.password,
+                sessionId: session.id, siteId: site.id, creditCard, address,
+            });
         if (!user){
             return {
                 success: false,
@@ -572,7 +573,7 @@ export const signUpFMail = async (prevState: ActionResponse | null, formData: Fo
             }
         }
 
-        await createDemoSession(user.id, session.id, site.id);
+        await createDemoSession(user.id, session.id, site.id, site.slug);
 
         return {
             success: true,
