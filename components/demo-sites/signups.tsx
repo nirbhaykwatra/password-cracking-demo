@@ -1,17 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ActionResponse, signUpFlixWatch, signUpFMail, signUpShopZone } from "@/app/actions/auth";
 
-export function FlixWatchSignup() {
+function FormErrors({ state, className }: { state: ActionResponse | null; className?: string }) {
+    if (!state || state.success) return null;
+    const fieldErrors = state.errors ? Object.values(state.errors).flat() : [];
+    const messages = fieldErrors.length > 0 ? fieldErrors : state.error ? [state.error] : [];
+    if (messages.length === 0) return null;
+
+    return (
+        <div role="alert" className={className}>
+            {messages.map((m) => (
+                <p key={m}>{m}</p>
+            ))}
+        </div>
+    );
+}
+
+export function FlixWatchSignup({ sessionCode, siteSlug }: { sessionCode: string, siteSlug: string }) {
     const router = useRouter();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+    const [state, formAction, isPending] = useActionState<ActionResponse | null, FormData>(
+        signUpFlixWatch,
+        null
+    );
 
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        router.push("/flixwatch/dashboard");
-    }
+    useEffect(() => {
+        if (state?.success) {
+            router.push(`/${sessionCode}/${siteSlug}/dashboard`);
+        }
+    }, [state, router, sessionCode, siteSlug]);
 
     const input =
         "peer w-full rounded bg-[#333] px-4 pb-2 pt-6 text-base text-white outline-none ring-0 focus:bg-[#454545]";
@@ -34,7 +53,7 @@ export function FlixWatchSignup() {
 
                 <main className="relative z-10 flex flex-1 items-start justify-center px-4 pb-16 md:items-center">
                     <form
-                        onSubmit={handleSubmit}
+                        action={formAction}
                         className="w-full max-w-[450px] rounded bg-black/75 px-8 py-10 md:px-16 md:py-14"
                     >
                         <h1 className="mb-2 text-[32px] font-bold">Create a password to start your membership</h1>
@@ -43,11 +62,10 @@ export function FlixWatchSignup() {
                         <div className="relative mb-4">
                             <input
                                 id="email"
+                                name="email"
                                 type="email"
                                 required
-                                placeholder=" "
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="name@fmail.test"
                                 className={input}
                             />
                             <label htmlFor="email" className={label}>Email</label>
@@ -56,38 +74,57 @@ export function FlixWatchSignup() {
                         <div className="relative mb-6">
                             <input
                                 id="password"
+                                name="password"
                                 type="password"
                                 required
                                 placeholder=" "
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
                                 className={input}
                             />
                             <label htmlFor="password" className={label}>Add a password</label>
                         </div>
 
+                        <div className="relative mb-6">
+                            <input
+                                id="confirm-password"
+                                name="confirm-password"
+                                type="password"
+                                required
+                                placeholder=" "
+                                className={input}
+                            />
+                            <label htmlFor="confirm-password" className={label}>Re-enter your password</label>
+                        </div>
+                        <input
+                            id="sessionCode"
+                            name="sessionCode"
+                            type="hidden"
+                            value={sessionCode}
+                        />
                         <div className="mb-6 space-y-3">
                             {plans.map((p) => (
                                 <label
                                     key={p.name}
                                     className="flex cursor-pointer items-center justify-between rounded border border-[#333] px-4 py-3 text-sm hover:border-[#8c8c8c]"
                                 >
-                  <span className="flex items-center gap-3">
-                    <input type="radio" name="plan" defaultChecked={p.name === "Premium"} className="h-4 w-4 accent-[#e50914]" />
-                    <span>
-                      <span className="block font-semibold">{p.name} — ${p.price}/mo</span>
-                      <span className="block text-xs text-[#8c8c8c]">{p.quality} · {p.screens}</span>
-                    </span>
-                  </span>
+                                      <span className="flex items-center gap-3">
+                                        <input type="radio" name="plan" defaultChecked={p.name === "Premium"} className="h-4 w-4 accent-[#e50914]" />
+                                        <span>
+                                          <span className="block font-semibold">{p.name} — ${p.price}/mo</span>
+                                          <span className="block text-xs text-[#8c8c8c]">{p.quality} · {p.screens}</span>
+                                        </span>
+                                      </span>
                                 </label>
                             ))}
                         </div>
 
+                        <FormErrors state={state} className="mb-4 text-sm text-[#e87c03]" />
+
                         <button
                             type="submit"
-                            className="w-full rounded bg-[#e50914] py-3 font-semibold hover:bg-[#c11119]"
+                            disabled={isPending}
+                            className="w-full rounded bg-[#e50914] py-3 font-semibold hover:bg-[#c11119] disabled:opacity-60"
                         >
-                            Next
+                            {isPending ? "Creating account…" : "Next"}
                         </button>
 
                         <p className="mt-6 text-xs text-[#8c8c8c]">
@@ -95,7 +132,7 @@ export function FlixWatchSignup() {
                         </p>
 
                         <p className="mt-8 text-[#b3b3b3]">
-                            Already have an account? <a href="/flixwatch/login" className="text-white hover:underline">Sign in.</a>
+                            Already have an account? <a href={`/${sessionCode}/${siteSlug}/signin`} className="text-white hover:underline">Sign in.</a>
                         </p>
                     </form>
                 </main>
@@ -113,18 +150,18 @@ export function FlixWatchSignup() {
     );
 }
 
-export function FMailSignup() {
+export function FMailSignup({ sessionCode, siteSlug }: { sessionCode: string, siteSlug: string }) {
     const router = useRouter();
-    const [firstName, setFirstName] = useState("");
-    const [lastName, setLastName] = useState("");
-    const [username, setUsername] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirm, setConfirm] = useState("");
+    const [state, formAction, isPending] = useActionState<ActionResponse | null, FormData>(
+        signUpFMail,
+        null
+    );
 
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        router.push("/fmail/dashboard");
-    }
+    useEffect(() => {
+        if (state?.success) {
+            router.push(`/${sessionCode}/${siteSlug}/dashboard`);
+        }
+    }, [state, router, sessionCode, siteSlug]);
 
     const field =
         "w-full rounded border border-[#747775] px-3.5 py-3 text-base text-[#1f1f1f] outline-none focus:border-2 focus:border-[#0b57d0] focus:px-[13px] focus:py-[11px]";
@@ -140,21 +177,19 @@ export function FMailSignup() {
                     <h1 className="text-[28px] font-normal leading-9">Create your FMail Account</h1>
                     <p className="mt-1 text-sm text-[#444746]">Enter your name to get started</p>
 
-                    <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                    <form action={formAction} className="mt-6 space-y-4">
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <input
                                 type="text"
+                                name="first-name"
                                 required
                                 placeholder="First name"
-                                value={firstName}
-                                onChange={(e) => setFirstName(e.target.value)}
                                 className={field}
                             />
                             <input
                                 type="text"
+                                name="last-name"
                                 placeholder="Last name"
-                                value={lastName}
-                                onChange={(e) => setLastName(e.target.value)}
                                 className={field}
                             />
                         </div>
@@ -162,48 +197,54 @@ export function FMailSignup() {
                         <div className="flex overflow-hidden rounded border border-[#747775] focus-within:border-2 focus-within:border-[#0b57d0]">
                             <input
                                 type="text"
+                                name="username"
                                 required
                                 placeholder="Username"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
                                 className="min-w-0 flex-1 px-3.5 py-3 text-base outline-none"
                             />
-                            <span className="flex items-center bg-[#f0f4f9] px-3 text-sm text-[#444746]">@fmail-demo.test</span>
+                            <span className="flex items-center bg-[#f0f4f9] px-3 text-sm text-[#444746]">@fmail.test</span>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <input
                                 type="password"
+                                name="password"
                                 required
                                 placeholder="Password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
                                 className={field}
                             />
                             <input
                                 type="password"
+                                name="confirm-password"
                                 required
                                 placeholder="Confirm"
-                                value={confirm}
-                                onChange={(e) => setConfirm(e.target.value)}
                                 className={field}
                             />
                         </div>
+                        <input
+                            id="sessionCode"
+                            name="sessionCode"
+                            type="hidden"
+                            value={sessionCode}
+                        />
                         <p className="text-xs text-[#444746]">Use 8 or more characters with a mix of letters, numbers &amp; symbols.</p>
+
+                        <FormErrors state={state} className="text-sm text-[#b3261e]" />
 
                         <p className="pt-2 text-sm leading-5 text-[#444746]">
                             This is a fictional demo sign-up. Don&apos;t enter a real name, email, or password. <a href="#" className="font-medium text-[#0b57d0]">Learn more</a>
                         </p>
 
                         <div className="flex items-center justify-between pt-4">
-                            <a href="/fmail/login" className="rounded px-2 py-2 text-sm font-medium text-[#0b57d0] hover:bg-[#f0f4f9]">
+                            <a href={`/${sessionCode}/${siteSlug}/signin`} className="rounded px-2 py-2 text-sm font-medium text-[#0b57d0] hover:bg-[#f0f4f9]">
                                 Sign in instead
                             </a>
                             <button
                                 type="submit"
-                                className="rounded-full bg-[#0b57d0] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#0a4cb8] hover:shadow"
+                                disabled={isPending}
+                                className="rounded-full bg-[#0b57d0] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#0a4cb8] hover:shadow disabled:opacity-60"
                             >
-                                Next
+                                {isPending ? "Creating…" : "Next"}
                             </button>
                         </div>
                     </form>
@@ -222,17 +263,18 @@ export function FMailSignup() {
     );
 }
 
-export function ShopZoneSignup() {
+export function ShopZoneSignup({ sessionCode, siteSlug }: { sessionCode: string, siteSlug: string }) {
     const router = useRouter();
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirm, setConfirm] = useState("");
+    const [state, formAction, isPending] = useActionState<ActionResponse | null, FormData>(
+        signUpShopZone,
+        null
+    );
 
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        router.push("/shopzone/dashboard");
-    }
+    useEffect(() => {
+        if (state?.success) {
+            router.push(`/${sessionCode}/${siteSlug}/dashboard`);
+        }
+    }, [state, router, sessionCode, siteSlug]);
 
     const input =
         "mt-1 w-full rounded-[3px] border border-[#a6a6a6] border-t-[#949494] px-2.5 py-1.5 text-sm outline-none focus:border-[#e77600] focus:shadow-[0_0_3px_2px_rgba(228,121,17,0.5)]";
@@ -245,63 +287,42 @@ export function ShopZoneSignup() {
                 </div>
 
                 <form
-                    onSubmit={handleSubmit}
+                    action={formAction}
                     className="w-full max-w-[350px] space-y-4 rounded-lg border border-[#ddd] p-5"
                 >
                     <h1 className="text-[28px] font-normal leading-tight">Create account</h1>
 
                     <label className="block text-[13px] font-bold">
-                        Your name
-                        <input
-                            type="text"
-                            required
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className={input}
-                        />
-                    </label>
-
-                    <label className="block text-[13px] font-bold">
                         Email
-                        <input
-                            type="email"
-                            required
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className={input}
-                        />
+                        <input type="email" name="email" required className={input} />
                     </label>
 
                     <label className="block text-[13px] font-bold">
                         Password
-                        <input
-                            type="password"
-                            required
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className={input}
-                        />
-                        <span className="mt-1 block text-xs font-normal text-[#565959]">At least 6 characters</span>
+                        <input type="password" name="password" required className={input} />
+                        <span className="mt-1 block text-xs font-normal text-[#565959]">At least 8 characters</span>
                     </label>
 
                     <label className="block text-[13px] font-bold">
                         Re-enter password
-                        <input
-                            type="password"
-                            required
-                            value={confirm}
-                            onChange={(e) => setConfirm(e.target.value)}
-                            className={input}
-                        />
+                        <input type="password" name="confirm-password" required className={input} />
                     </label>
+
+                    <FormErrors state={state} className="text-xs text-[#c40000]" />
 
                     <button
                         type="submit"
-                        className="w-full rounded-lg border border-[#fcd200] bg-[#ffd814] py-1.5 text-[13px] shadow-sm hover:bg-[#f7ca00]"
+                        disabled={isPending}
+                        className="w-full rounded-lg border border-[#fcd200] bg-[#ffd814] py-1.5 text-[13px] shadow-sm hover:bg-[#f7ca00] disabled:opacity-60"
                     >
-                        Create your ShopZone account
+                        {isPending ? "Creating account…" : "Create your ShopZone account"}
                     </button>
-
+                    <input
+                        id="sessionCode"
+                        name="sessionCode"
+                        type="hidden"
+                        value={sessionCode}
+                    />
                     <p className="text-xs leading-5 text-[#565959]">
                         By creating an account, you agree to ShopZone&apos;s Conditions of Use and Privacy Notice. This is a
                         fictional demo — don&apos;t enter real information.
@@ -315,7 +336,7 @@ export function ShopZoneSignup() {
                         <span className="h-px flex-1 bg-[#e7e7e7]" />
                     </div>
                     <a
-                        href="/shopzone/login"
+                        href={`/${sessionCode}/${siteSlug}/signin`}
                         className="block w-full rounded-lg border border-[#d5d9d9] bg-gradient-to-b from-[#f7fafa] to-[#e7eaea] py-1.5 text-center text-[13px] shadow-sm hover:from-[#e7eaea]"
                     >
                         Sign in instead
@@ -334,5 +355,3 @@ export function ShopZoneSignup() {
         </div>
     );
 }
-
-

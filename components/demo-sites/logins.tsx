@@ -3,12 +3,13 @@
 import {useActionState, useEffect, useState} from "react";
 import { useRouter } from "next/navigation";
 import { ActionResponse, signInFlixWatch, signInFMail, signInShopZone } from "@/app/actions/auth";
+import Link from "next/link";
 
 //region Demo Sites
 
 //region FlixWatch
 
-export function FlixWatchLogin() {
+export function FlixWatchLogin({ sessionCode, siteSlug }: { sessionCode: string, siteSlug: string }) {
     const router = useRouter();
     const [state, formAction, isPending] = useActionState<ActionResponse | null, FormData>(
         signInFlixWatch,
@@ -17,7 +18,7 @@ export function FlixWatchLogin() {
 
     useEffect(() => {
         if (state?.success) {
-            router.push("/dashboard");
+            router.push(`/${sessionCode}/${siteSlug}/dashboard`);
         }
     }, [state, router]);
 
@@ -31,6 +32,7 @@ export function FlixWatchLogin() {
                 </header>
 
                 <main className="relative z-10 flex flex-1 items-start justify-center px-4 pb-16 md:items-center">
+                    {state?.error && <p role="alert" className="text-sm text-[#b3261e]">{state.error}</p>}
                     <form
                         action={formAction}
                         className="w-full max-w-[450px] rounded bg-black/75 px-8 py-10 md:px-16 md:py-14"
@@ -40,6 +42,7 @@ export function FlixWatchLogin() {
                         <div className="relative mb-4">
                             <input
                                 id="email"
+                                name="email"
                                 type="email"
                                 required
                                 placeholder=" "
@@ -51,6 +54,7 @@ export function FlixWatchLogin() {
                         <div className="relative mb-6">
                             <input
                                 id="password"
+                                name="password"
                                 type="password"
                                 required
                                 placeholder=" "
@@ -81,11 +85,17 @@ export function FlixWatchLogin() {
                         </label>
 
                         <p className="mt-8 text-[#b3b3b3]">
-                            New to FlixWatch? <a href="#" className="text-white hover:underline">Sign up now.</a>
+                            New to FlixWatch? <a href={`/${sessionCode}/${siteSlug}/signup`} className="text-white hover:underline">Sign up now.</a>
                         </p>
                         <p className="mt-3 text-xs text-[#8c8c8c]">
                             This page is a fictional demo and is not protected by any real verification.
                         </p>
+                        <input
+                            id="sessionCode"
+                            name="sessionCode"
+                            type="hidden"
+                            value={sessionCode}
+                        />
                     </form>
                 </main>
 
@@ -106,7 +116,7 @@ export function FlixWatchLogin() {
 
 //region FMail
 
-export function FMailLogin() {
+export function FMailLogin({ sessionCode, siteSlug }: { sessionCode: string, siteSlug: string }) {
     const router = useRouter();
     const [step, setStep] = useState<"email" | "password">("email");
     const [email, setEmail] = useState("");
@@ -120,7 +130,7 @@ export function FMailLogin() {
     // not on every render, and not before the password has been submitted.
     useEffect(() => {
         if (state?.success) {
-            router.push("/fmail/dashboard");
+            router.push(`/${sessionCode}/${siteSlug}/dashboard`);
         }
     }, [state, router]);
 
@@ -159,6 +169,7 @@ export function FMailLogin() {
                         )}
                     </div>
 
+                    {state?.error && <p role="alert" className="text-sm text-[#b3261e]">{state.error}</p>}
                     {step === "email" ? (
                         // Step 1 is pure client-side UI state — nothing to send to the
                         // server until we actually have a password to check.
@@ -166,6 +177,7 @@ export function FMailLogin() {
                             <div>
                                 <input
                                     type="email"
+                                    name="email"
                                     required
                                     autoFocus
                                     placeholder="Email or phone"
@@ -184,7 +196,7 @@ export function FMailLogin() {
                             </div>
 
                             <div className="mt-10 flex items-center justify-between">
-                                <a href="/fmail/signup" className="rounded px-2 py-2 text-sm font-medium text-[#0b57d0] hover:bg-[#f0f4f9]">
+                                <a href={`/${sessionCode}/${siteSlug}/signup`} className="rounded px-2 py-2 text-sm font-medium text-[#0b57d0] hover:bg-[#f0f4f9]">
                                     Create account
                                 </a>
                                 <button
@@ -240,6 +252,12 @@ export function FMailLogin() {
                                     {isPending ? "Signing in…" : "Next"}
                                 </button>
                             </div>
+                            <input
+                                id="sessionCode"
+                                name="sessionCode"
+                                type="hidden"
+                                value={sessionCode}
+                            />
                         </form>
                     )}
                 </div>
@@ -261,7 +279,7 @@ export function FMailLogin() {
 
 //region ShopZone
 
-export function ShopZoneLogin() {
+export function ShopZoneLogin({ sessionCode, siteSlug }: { sessionCode: string, siteSlug: string }) {
     const router = useRouter();
     const [state, formAction, isPending] = useActionState<ActionResponse | null, FormData>(
         signInShopZone,
@@ -270,7 +288,7 @@ export function ShopZoneLogin() {
 
     useEffect(() => {
         if (state?.success) {
-            router.push("/dashboard");
+            router.push(`/${sessionCode}/${siteSlug}/dashboard`);
         }
     }, [state, router]);
 
@@ -281,6 +299,7 @@ export function ShopZoneLogin() {
                     shop<span className="text-[#ff9900]">zone</span>
                 </div>
 
+                {state?.error && <p role="alert" className="text-sm text-[#b3261e]">{state.error}</p>}
                 <form
                     action={formAction}
                     className="w-full max-w-[350px] space-y-4 rounded-lg border border-[#ddd] p-5"
@@ -290,8 +309,8 @@ export function ShopZoneLogin() {
                     <label className="block text-[13px] font-bold">
                         Email
                         <input
-                            id="username"
-                            name="username"
+                            id="email"
+                            name="email"
                             type="text"
                             autoComplete="email"
                             placeholder="scanlan@critrole.com"
@@ -300,12 +319,12 @@ export function ShopZoneLogin() {
                     </label>
 
                     <label className="block text-[13px] font-bold">
-            <span className="flex items-baseline justify-between">
-              Password
-              <a href="#" className="text-xs font-normal text-[#007185] hover:text-[#c7511f] hover:underline">
-                Forgot password?
-              </a>
-            </span>
+                        <span className="flex items-baseline justify-between">
+                          Password
+                          <a href="#" className="text-xs font-normal text-[#007185] hover:text-[#c7511f] hover:underline">
+                            Forgot password?
+                          </a>
+                        </span>
                         <input
                             id="password"
                             name="password"
@@ -326,6 +345,12 @@ export function ShopZoneLogin() {
                     <label className="flex items-center gap-2 text-[13px]">
                         <input type="checkbox" /> Keep me signed in
                     </label>
+                    <input
+                        id="sessionCode"
+                        name="sessionCode"
+                        type="hidden"
+                        value={sessionCode}
+                    />
                 </form>
 
                 <div className="mt-5 w-full max-w-[350px]">
@@ -334,9 +359,9 @@ export function ShopZoneLogin() {
                         New to ShopZone?
                         <span className="h-px flex-1 bg-[#e7e7e7]" />
                     </div>
-                    <button className="w-full rounded-lg border border-[#d5d9d9] bg-gradient-to-b from-[#f7fafa] to-[#e7eaea] py-1.5 text-[13px] shadow-sm hover:from-[#e7eaea]">
+                    <Link href={`/${sessionCode}/${siteSlug}/signup`} className="w-full rounded-lg border border-[#d5d9d9] bg-gradient-to-b from-[#f7fafa] to-[#e7eaea] py-1.5 text-[13px] shadow-sm hover:from-[#e7eaea]">
                         Create your ShopZone account
-                    </button>
+                    </Link>
                 </div>
             </main>
 

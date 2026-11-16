@@ -29,6 +29,27 @@
       "when": 1792416032112,
       "tag": "0003_purple_khan",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794726514735,
+      "tag": "0004_bouncy_mandarin",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794837047152,
+      "tag": "0005_little_sasquatch",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794846005136,
+      "tag": "0006_chilly_manta",
+      "breakpoints": true
     }
   ]
 }

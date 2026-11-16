@@ -4,7 +4,8 @@ import { compare, hash } from 'bcrypt';
 import { cookies } from "next/headers";
 import * as jose from 'jose';
 import { cache } from 'react';
-import { hash as cryptoHash, randomBytes } from 'node:crypto';
+import {createHash, hash as cryptoHash, randomBytes} from 'node:crypto';
+import {integer, text} from "drizzle-orm/pg-core";
 
 // JWT types
 interface JWTPayload {
@@ -33,6 +34,17 @@ export async function verifyPassword(password: string, storedPassword: string): 
     return await compare(password, storedPassword);
 }
 
+export async function md5Hash(password: string): Promise<string> {
+    return createHash('md5').update(password).digest('hex');
+}
+
+export async function verifyMd5Password(password: string, storedPassword: string): Promise<boolean> {
+    return createHash('md5').update(password).digest('hex') === storedPassword;
+}
+export async function verifyPlainTextPassword(password: string, storedPassword: string): Promise<boolean> {
+    return password === storedPassword;
+}
+
 export async function createInstructor(name: string, password: string) {
     const hashedPassword = await hashPassword(password);
 
@@ -44,18 +56,137 @@ export async function createInstructor(name: string, password: string) {
     return { id:  newInstructor.id, name };
 }
 
-export async function createUser(name: string, email: string, password: string){
+export async function createFlixWatchUser(
+    name: string,
+    email: string,
+    password: string,
+    sessionId: number,
+    siteId: number,
+    creditCard: {
+        number: string,
+        exp_month: number,
+        exp_year: number,
+        cvc: string,
+    },
+    address: {
+        line1: string,
+        line2: string | null,
+        city: string,
+        state: string,
+        postal_code: string,
+        country: string,
+    }
+){
 
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = await md5Hash(password);
 
-/*    const [newUser] = await db.insert(users).values({
+    const [newUser] = await db.insert(users).values({
         name,
         email,
         password: hashedPassword,
+        sessionId,
+        siteId,
+        creditCard: creditCard.number,
+        cardExpMonth: creditCard.exp_month,
+        cardExpYear: creditCard.exp_year,
+        cardCvc: creditCard.cvc,
+        addressLine1: address.line1,
+        addressLine2: address.line2,
+        addressCity: address.city,
+        addressState: address.state,
+        addressZip: address.postal_code,
+        addressCountry: address.country,
     }).returning({ id: users.id });
 
-    return { id: newUser.id , name, email }*/
-    return { id: 0 };
+    return { id: newUser.id , name, email }
+}
+
+export async function createFMailUser(
+    name: string,
+    email: string,
+    password: string,
+    sessionId: number,
+    siteId: number,
+    creditCard: {
+        number: string,
+        exp_month: number,
+        exp_year: number,
+        cvc: string,
+    },
+    address: {
+        line1: string,
+        line2: string | null,
+        city: string,
+        state: string,
+        postal_code: string,
+        country: string,
+    }
+){
+
+    const [newUser] = await db.insert(users).values({
+        name,
+        email,
+        password,
+        sessionId,
+        siteId,
+        creditCard: creditCard.number,
+        cardExpMonth: creditCard.exp_month,
+        cardExpYear: creditCard.exp_year,
+        cardCvc: creditCard.cvc,
+        addressLine1: address.line1,
+        addressLine2: address.line2,
+        addressCity: address.city,
+        addressState: address.state,
+        addressZip: address.postal_code,
+        addressCountry: address.country,
+    }).returning({ id: users.id });
+
+    return { id: newUser.id , name, email }
+}
+
+export async function createShopZoneUser(
+    name: string,
+    email: string,
+    password: string,
+    sessionId: number,
+    siteId: number,
+    creditCard: {
+        number: string,
+        exp_month: number,
+        exp_year: number,
+        cvc: string,
+    },
+    address: {
+        line1: string,
+        line2: string | null,
+        city: string,
+        state: string,
+        postal_code: string,
+        country: string,
+    }
+){
+
+    const hashedPassword = await hashPassword(password);
+
+    const [newUser] = await db.insert(users).values({
+        name,
+        email,
+        password: hashedPassword,
+        sessionId,
+        siteId,
+        creditCard: creditCard.number,
+        cardExpMonth: creditCard.exp_month,
+        cardExpYear: creditCard.exp_year,
+        cardCvc: creditCard.cvc,
+        addressLine1: address.line1,
+        addressLine2: address.line2,
+        addressCity: address.city,
+        addressState: address.state,
+        addressZip: address.postal_code,
+        addressCountry: address.country,
+    }).returning({ id: users.id });
+
+    return { id: newUser.id , name, email }
 }
 
 // Generate a JWT token
@@ -122,6 +253,30 @@ export async function createSession(userId: number) {
     }
 }
 
+export async function createDemoSession(userId: number, sessionId: number, siteId: number){
+    try {
+        // Create JWT with user data
+        const token = await generateJWT({ userId, sessionId, siteId })
+
+        // Store JWT in a cookie
+        const cookieStore = await cookies()
+        cookieStore.set({
+            name: 'demo_auth_token',
+            value: token,
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 60 * 60 * 24 * 7, // 1 week
+            path: '/',
+            sameSite: 'lax',
+        })
+
+        return true
+    } catch (error) {
+        console.error('Error creating session:', error)
+        return false
+    }
+}
+
 // Get current session from JWT
 export const getSession = cache(async () => {
     try {
@@ -132,6 +287,32 @@ export const getSession = cache(async () => {
         const payload = await verifyJWT(token)
 
         return payload ? { userId: payload.userId } : null
+    } catch (error) {
+        // Handle the specific prerendering error
+        if (
+            error instanceof Error &&
+            error.message.includes('During prerendering, `cookies()` rejects')
+        ) {
+            console.log(
+                'Cookies not available during prerendering, returning null session'
+            )
+            return null
+        }
+
+        console.error('Error getting session:', error)
+        return null
+    }
+})
+
+export const getDemoSession = cache(async (sessionId: number, siteId: number) => {
+    try {
+        const cookieStore = await cookies()
+        const token = cookieStore.get('demo_auth_token')?.value
+
+        if (!token) return null
+        const payload = await verifyJWT(token)
+
+        return payload ? { userId: payload.userId, sessionId: payload.sessionId, siteId: payload.siteId } : null
     } catch (error) {
         // Handle the specific prerendering error
         if (

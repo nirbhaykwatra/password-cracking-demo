@@ -1,7 +1,16 @@
 "use server";
 import { z } from "zod";
-import { createUser, verifyPassword, createSession, deleteSession } from "@/lib/auth";
-import { getInstructorByUsername, getDemoUserByEmail } from "@/lib/dal";
+import {
+    createFlixWatchUser, createShopZoneUser, createFMailUser, verifyPassword, createSession, deleteSession,
+    createDemoSession, verifyMd5Password, verifyPlainTextPassword
+} from "@/lib/auth";
+import {
+    getInstructorByUsername,
+    getDemoUserByEmail,
+    getDemoUserBySiteSlug,
+    getSiteBySlug,
+    getSessionByCode, generateCreditCard, generateDemoAddress
+} from "@/lib/dal";
 import { redirect } from "next/navigation";
 
 export type ActionResponse = {
@@ -16,6 +25,41 @@ const SignInSchema = z.object({
     username: z.string().min(1, 'Username is required'),
     password: z.string().min(1, 'Password is required'),
 })
+
+const DemoSignInSchema = z.object({
+    email: z
+        .email('Invalid email format')
+        .refine((value) => value.toLowerCase().endsWith('@fmail.test'), {
+            message: 'Email must be an @fmail.test address',
+        }),
+    password: z.string().min(1, 'Password is required'),
+})
+
+const DemoSchemaSignUp = z.object({
+    email: z
+        .email('Invalid email format')
+        .refine((value) => value.toLowerCase().endsWith('@fmail.test'), {
+            message: 'Email must be an @fmail.test address',
+        }),
+    password: z.string().min(1, 'Password is required'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+})
+    .refine((data) => data.password === data.confirmPassword, {
+        message: "Passwords don't match",
+        path: ['confirmPassword'],
+    })
+
+const FMailSchemaSignUp = z.object({
+    first: z.string().min(1, 'First name is required').nonempty(),
+    last: z.string().min(1, 'Last name is required').nonempty(),
+    username: z.string().min(1, 'Username is required').nonempty(),
+    password: z.string().min(1, 'Password is required'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+})
+    .refine((data) => data.password === data.confirmPassword, {
+        message: "Passwords don't match",
+        path: ['confirmPassword'],
+    })
 
 // Define Zod schema for signup validation
 const SignUpSchema = z
@@ -88,12 +132,12 @@ export const signIn = async (prevState: ActionResponse | null, formData: FormDat
 export const signInShopZone = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
     try {
         const data = {
-            username: formData.get("username") as string,
             email: formData.get("email") as string,
             password: formData.get("password") as string,
+            sessionCode: formData.get("sessionCode") as string,
         }
 
-        const validation = SignInSchema.safeParse(data)
+        const validation = DemoSignInSchema.safeParse(data)
         if (!validation.success) {
             return {
                 success: false,
@@ -102,12 +146,30 @@ export const signInShopZone = async (prevState: ActionResponse | null, formData:
             }
         }
 
-        const user = await getDemoUserByEmail(data.email)
+        const session = await getSessionByCode(data.sessionCode)
+        if (!session){
+            return {
+                success: false,
+                message: "Invalid session code",
+                error: "Invalid session code"
+            }
+        }
+
+        const site = await getSiteBySlug('shopzone')
+        if (!site){
+            return {
+                success: false,
+                message: "Invalid site",
+                error: "Invalid site"
+            }
+        }
+
+        const user = await getDemoUserBySiteSlug(data.email, 'shopzone', data.sessionCode);
         if (!user) {
             return {
                 success: false,
-                message: "Invalid Email",
-                error: "Invalid Email"
+                message: "Something went wrong",
+                error: "Something went wrong"
             }
         }
 
@@ -121,7 +183,7 @@ export const signInShopZone = async (prevState: ActionResponse | null, formData:
             }
         }
 
-        await createSession(user.id);
+        await createDemoSession(user.id, session.id, site.id);
 
         return {
             success: true,
@@ -144,9 +206,10 @@ export const signInFlixWatch = async (prevState: ActionResponse | null, formData
             username: formData.get("username") as string,
             email: formData.get("email") as string,
             password: formData.get("password") as string,
+            sessionCode: formData.get("sessionCode") as string,
         }
 
-        const validation = SignInSchema.safeParse(data)
+        const validation = DemoSignInSchema.safeParse(data)
         if (!validation.success) {
             return {
                 success: false,
@@ -155,17 +218,35 @@ export const signInFlixWatch = async (prevState: ActionResponse | null, formData
             }
         }
 
-        const user = await getDemoUserByEmail(data.email)
+        const session = await getSessionByCode(data.sessionCode)
+        if (!session){
+            return {
+                success: false,
+                message: "Invalid session code",
+                error: "Invalid session code"
+            }
+        }
+
+        const site = await getSiteBySlug('flixwatch')
+        if (!site){
+            return {
+                success: false,
+                message: "Invalid site",
+                error: "Invalid site"
+            }
+        }
+
+        const user = await getDemoUserBySiteSlug(data.email, 'flixwatch', data.sessionCode);
         if (!user) {
             return {
                 success: false,
-                message: "Invalid Email",
-                error: "Invalid Email"
+                message: "Something went wrong",
+                error: "Something went wrong"
             }
         }
 
         // Verify Password
-        const verified = await verifyPassword(data.password, user.password)
+        const verified = await verifyMd5Password(data.password, user.password)
         if (!verified) {
             return {
                 success: false,
@@ -174,7 +255,7 @@ export const signInFlixWatch = async (prevState: ActionResponse | null, formData
             }
         }
 
-        await createSession(user.id);
+        await createDemoSession(user.id, session.id, site.id);
 
         return {
             success: true,
@@ -194,12 +275,15 @@ export const signInFlixWatch = async (prevState: ActionResponse | null, formData
 export const signInFMail = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
     try {
         const data = {
+            first: formData.get("first-name") as string,
+            last: formData.get("last-name") as string,
             username: formData.get("username") as string,
             email: formData.get("email") as string,
             password: formData.get("password") as string,
+            sessionCode: formData.get("sessionCode") as string,
         }
 
-        const validation = SignInSchema.safeParse(data)
+        const validation = DemoSignInSchema.safeParse(data)
         if (!validation.success) {
             return {
                 success: false,
@@ -208,17 +292,35 @@ export const signInFMail = async (prevState: ActionResponse | null, formData: Fo
             }
         }
 
-        const user = await getDemoUserByEmail(data.email)
+        const session = await getSessionByCode(data.sessionCode)
+        if (!session){
+            return {
+                success: false,
+                message: "Invalid session code",
+                error: "Invalid session code"
+            }
+        }
+
+        const site = await getSiteBySlug('fmail')
+        if (!site){
+            return {
+                success: false,
+                message: "Invalid site",
+                error: "Invalid site"
+            }
+        }
+
+        const user = await getDemoUserBySiteSlug(data.email, 'fmail', data.sessionCode);
         if (!user) {
             return {
                 success: false,
-                message: "Invalid Email",
-                error: "Invalid Email"
+                message: "Something went wrong",
+                error: "Something went wrong"
             }
         }
 
         // Verify Password
-        const verified = await verifyPassword(data.password, user.password)
+        const verified = await verifyPlainTextPassword(data.password, user.password)
         if (!verified) {
             return {
                 success: false,
@@ -227,7 +329,7 @@ export const signInFMail = async (prevState: ActionResponse | null, formData: Fo
             }
         }
 
-        await createSession(user.id);
+        await createDemoSession(user.id, session.id, site.id);
 
         return {
             success: true,
@@ -251,13 +353,13 @@ export const signInFMail = async (prevState: ActionResponse | null, formData: Fo
 export const signUpShopZone = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
     try {
         const data = {
-            username: formData.get("username") as string,
             email: formData.get("email") as string,
             password: formData.get("password") as string,
             confirmPassword: formData.get("confirm-password") as string,
+            sessionCode: formData.get("sessionCode") as string
         }
 
-        const validation = SignUpSchema.safeParse(data)
+        const validation = DemoSchemaSignUp.safeParse(data)
         if (!validation.success) {
             return {
                 success: false,
@@ -266,7 +368,16 @@ export const signUpShopZone = async (prevState: ActionResponse | null, formData:
             }
         }
 
-        const existingUser = await getDemoUserByEmail(data.email)
+        const fmail = await getDemoUserBySiteSlug(data.email, 'fmail', data.sessionCode);
+        if (!fmail){
+            return {
+                success: false,
+                message: "That email does not exist!",
+                error: "That email does not exist!"
+            }
+        }
+
+        const existingUser = await getDemoUserBySiteSlug(data.email, 'shopzone', data.sessionCode)
         if (existingUser){
             return {
                 success: false,
@@ -275,7 +386,29 @@ export const signUpShopZone = async (prevState: ActionResponse | null, formData:
             }
         }
 
-        const user = await createUser(data.username, data.email, data.password);
+        const session = await getSessionByCode(data.sessionCode)
+        if (!session){
+            return {
+                success: false,
+                message: "Invalid session code",
+                error: "Invalid session code"
+            }
+        }
+
+        const site = await getSiteBySlug('shopzone')
+        if (!site){
+            return {
+                success: false,
+                message: "Invalid site",
+                error: "Invalid site"
+            }
+        }
+
+        const creditCard = await generateCreditCard();
+        const address = generateDemoAddress(data.email)
+
+        const user = await createShopZoneUser(
+            fmail.name, data.email, data.password, session.id, site.id, creditCard, address);
         if (!user){
             return {
                 success: false,
@@ -284,7 +417,7 @@ export const signUpShopZone = async (prevState: ActionResponse | null, formData:
             }
         }
 
-        await createSession(user.id);
+        await createDemoSession(user.id, session.id, site.id);
 
         return {
             success: true,
@@ -304,22 +437,22 @@ export const signUpShopZone = async (prevState: ActionResponse | null, formData:
 export const signUpFlixWatch = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
     try {
         const data = {
-            username: formData.get("username") as string,
             email: formData.get("email") as string,
             password: formData.get("password") as string,
             confirmPassword: formData.get("confirm-password") as string,
+            sessionCode: formData.get("sessionCode") as string
         }
 
-        const validation = SignUpSchema.safeParse(data)
-        if (!validation.success) {
+        const fmail = await getDemoUserBySiteSlug(data.email, 'fmail', data.sessionCode);
+        if (!fmail){
             return {
-                success: false,
-                message: "Invalid input",
-                errors: validation.error.flatten().fieldErrors,
+                 success: false,
+                 message: "That email does not exist!",
+                 error: "That email does not exist!"
             }
         }
 
-        const existingUser = await getDemoUserByEmail(data.email)
+        const existingUser = await getDemoUserBySiteSlug(data.email, 'flixwatch', data.sessionCode)
         if (existingUser){
             return {
                 success: false,
@@ -328,7 +461,29 @@ export const signUpFlixWatch = async (prevState: ActionResponse | null, formData
             }
         }
 
-        const user = await createUser(data.username, data.email, data.password);
+        const session = await getSessionByCode(data.sessionCode)
+        if (!session){
+            return {
+                success: false,
+                message: "Invalid session code",
+                error: "Invalid session code"
+            }
+        }
+
+        const site = await getSiteBySlug('flixwatch')
+        if (!site){
+            return {
+                success: false,
+                message: "Invalid site",
+                error: "Invalid site"
+            }
+        }
+
+        const creditCard = await generateCreditCard();
+        const address = generateDemoAddress(data.email)
+
+        const user = await createFlixWatchUser(
+            fmail.name, data.email, data.password, session.id, site.id, creditCard, address);
         if (!user){
             return {
                 success: false,
@@ -337,7 +492,7 @@ export const signUpFlixWatch = async (prevState: ActionResponse | null, formData
             }
         }
 
-        await createSession(user.id);
+        await createDemoSession(user.id, session.id, site.id);
 
         return {
             success: true,
@@ -357,13 +512,18 @@ export const signUpFlixWatch = async (prevState: ActionResponse | null, formData
 export const signUpFMail = async (prevState: ActionResponse | null, formData: FormData): Promise<ActionResponse> => {
     try {
         const data = {
+            first: formData.get("first-name") as string,
+            last: formData.get("last-name") as string,
             username: formData.get("username") as string,
-            email: formData.get("email") as string,
             password: formData.get("password") as string,
             confirmPassword: formData.get("confirm-password") as string,
+            sessionCode: formData.get("sessionCode") as string
         }
 
-        const validation = SignUpSchema.safeParse(data)
+        const email = data.username + "@fmail.test";
+        const username = data.first + " " +  data.last;
+
+        const validation = FMailSchemaSignUp.safeParse(data)
         if (!validation.success) {
             return {
                 success: false,
@@ -372,7 +532,7 @@ export const signUpFMail = async (prevState: ActionResponse | null, formData: Fo
             }
         }
 
-        const existingUser = await getDemoUserByEmail(data.email)
+        const existingUser = await getDemoUserBySiteSlug(email, 'fmail', data.sessionCode)
         if (existingUser){
             return {
                 success: false,
@@ -381,7 +541,29 @@ export const signUpFMail = async (prevState: ActionResponse | null, formData: Fo
             }
         }
 
-        const user = await createUser(data.username, data.email, data.password);
+        const session = await getSessionByCode(data.sessionCode)
+        if (!session){
+            return {
+                success: false,
+                message: "Invalid session code",
+                error: "Invalid session code"
+            }
+        }
+
+        const site = await getSiteBySlug('fmail')
+        if (!site){
+            return {
+                success: false,
+                message: "Invalid site",
+                error: "Invalid site"
+            }
+        }
+
+        const creditCard = await generateCreditCard();
+        const address = generateDemoAddress(email)
+
+        const user = await createFMailUser(
+            username, email, data.password, session.id, site.id, creditCard, address);
         if (!user){
             return {
                 success: false,
@@ -390,7 +572,7 @@ export const signUpFMail = async (prevState: ActionResponse | null, formData: Fo
             }
         }
 
-        await createSession(user.id);
+        await createDemoSession(user.id, session.id, site.id);
 
         return {
             success: true,

@@ -54,6 +54,16 @@ export const users = pgTable('users', {
     password: text('password').notNull(),
     sessionId: integer('session_id').notNull().references(() => classSessions.id, { onDelete: 'cascade' }),
     siteId: integer('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+    creditCard: text('credit_card').notNull(),
+    cardExpMonth: integer('card_exp_month').notNull(),
+    cardExpYear: integer('card_exp_year').notNull(),
+    cardCvc: text('card_cvc').notNull(),
+    addressLine1: text('address_line_1').notNull(),
+    addressLine2: text('address_line_2'),
+    addressCity: text('address_city').notNull(),
+    addressState: text('address_state').notNull(),
+    addressZip: text('address_zip').notNull(),
+    addressCountry: text('address_country').notNull()
 }, (table) => [
     unique().on(table.email, table.sessionId, table.siteId),
 ]);
