@@ -3,7 +3,6 @@ import { Lexend, IBM_Plex_Sans } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme/theme-provider'
 import { ThemeToggle } from '@/components/common/theme-toggle'
 import './globals.css'
-import {GURedHeader} from "@/components/common/headers";
 
 const lexend = Lexend({
   subsets: ['latin'],

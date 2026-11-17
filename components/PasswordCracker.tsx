@@ -4,9 +4,97 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import type { Config } from "@/lib/store";
 
-type WordlistMode = "dictionary" | "hybrid" | "keyspace";
+type WordlistMode = "dictionary" | "hybrid" | "keyspace" | "rules";
 const WORDLIST_SIZES = [100, 1000, 10000] as const;
 type LogEntry = { guess: string; status: "fail" | "success" | "locked"; ms: number };
+type RulePattern = "xkcd4" | "xkcd4-sep" | "word-digits" | "word-year" | "leet-word";
+
+const RULE_LABELS: Record<RulePattern, string> = {
+    xkcd4: "correcthorsebatterystaple (4 words, no separators)",
+    "xkcd4-sep": "correct-horse-battery-staple (4 words, hyphen-separated)",
+    "word-digits": "word + 2-4 digits (e.g. tiger482)",
+    "word-year": "Word + birth/grad year (e.g. Tiger2008)",
+    "leet-word": "l33tspeak word (e.g. p@ssw0rd)",
+};
+
+function* capitalizeVariants(word: string) {
+    yield word;
+    const capitalized = word.charAt(0).toUpperCase() + word.slice(1);
+    if (capitalized !== word) yield capitalized;
+}
+
+// correcthorsebatterystaple-style: every 4-word combination from a small vocabulary.
+// Capped to a manageable vocabulary slice so the keyspace stays demo-sized.
+function* xkcdGuesses(words: string[], separator: string, vocabSize: number) {
+    const vocab = words.slice(0, vocabSize);
+    for (const a of vocab) for (const b of vocab) for (const c of vocab) for (const d of vocab) {
+        yield [a, b, c, d].join(separator);
+    }
+}
+
+function* wordDigitsGuesses(words: string[], digitLength: number) {
+    const max = Math.pow(10, digitLength);
+    for (const word of words) {
+        for (let n = 0; n < max; n++) {
+            yield word + String(n).padStart(digitLength, "0");
+        }
+    }
+}
+
+function* wordYearGuesses(words: string[], startYear: number, endYear: number) {
+    for (const word of words) {
+        for (const variant of capitalizeVariants(word)) {
+            for (let year = startYear; year <= endYear; year++) {
+                yield variant + year;
+            }
+        }
+    }
+}
+
+const LEET_MAP: Record<string, string[]> = {
+    a: ["a", "4", "@"], e: ["e", "3"], i: ["i", "1", "!"],
+    o: ["o", "0"], s: ["s", "5", "$"], t: ["t", "7"],
+};
+
+// Every combination of leet substitutions for one word, e.g. "password" -> "p@ssw0rd"
+function* leetVariants(word: string): Generator<string> {
+    const options = word.toLowerCase().split("").map((ch) => LEET_MAP[ch] ?? [ch]);
+    const indices = new Array(options.length).fill(0);
+    while (true) {
+        yield indices.map((idx, pos) => options[pos][idx]).join("");
+        let pos = options.length - 1;
+        while (pos >= 0) {
+            indices[pos]++;
+            if (indices[pos] < options[pos].length) break;
+            indices[pos] = 0;
+            pos--;
+        }
+        if (pos < 0) break;
+    }
+}
+
+function* leetWordGuesses(words: string[]) {
+    for (const word of words) yield* leetVariants(word);
+}
+
+function buildRuleGenerator(pattern: RulePattern, words: string[], xkcdVocab: number): Generator<string> {
+    switch (pattern) {
+        case "xkcd4": return xkcdGuesses(words, "", xkcdVocab);
+        case "xkcd4-sep": return xkcdGuesses(words, "-", xkcdVocab);
+        case "word-digits": return wordDigitsGuesses(words, 3);
+        case "word-year": return wordYearGuesses(words, 1960, 2026);
+        case "leet-word": return leetWordGuesses(words);
+    }
+}
+
+function estimateRuleTotal(pattern: RulePattern, wordCount: number, xkcdVocab: number): number {
+    switch (pattern) {
+        case "xkcd4": case "xkcd4-sep": return Math.pow(Math.min(wordCount, xkcdVocab), 4);
+        case "word-digits": return wordCount * 1000;
+        case "word-year": return wordCount * 2 * (2026 - 1960 + 1);
+        case "leet-word": return wordCount * 8; // rough: most words have a few substitutable letters
+    }
+}
 
 function* hybridMutations(words: string[]) {
     const suffixes = ["", "1", "!", "123", "2024"];
@@ -32,15 +120,17 @@ function* keyspaceGuesses(charset: string, length: number) {
     }
 }
 
-function buildGenerator(mode: WordlistMode, words: string[], keyspaceLength: number): Generator<string> {
+function buildGenerator(mode: WordlistMode, words: string[], keyspaceLength: number, rulePattern: RulePattern, xkcdVocab: number): Generator<string> {
     if (mode === "dictionary") return (function* () { yield* words; })();
     if (mode === "hybrid") return hybridMutations(words);
+    if (mode === "rules") return buildRuleGenerator(rulePattern, words, xkcdVocab);
     return keyspaceGuesses("abcdefghijklmnopqrstuvwxyz", keyspaceLength);
 }
 
-function estimateTotal(mode: WordlistMode, wordCount: number, keyspaceLength: number): number {
+function estimateTotal(mode: WordlistMode, wordCount: number, keyspaceLength: number, rulePattern: RulePattern, xkcdVocab: number): number {
     if (mode === "dictionary") return wordCount;
     if (mode === "hybrid") return wordCount * 5 * 2;
+    if (mode === "rules") return estimateRuleTotal(rulePattern, wordCount, xkcdVocab);
     return Math.pow(26, keyspaceLength);
 }
 
@@ -55,7 +145,10 @@ export default function PasswordCracker({ usernames, websites, initialConfig }: 
     const [mode, setMode] = useState<WordlistMode>("dictionary");
     const [wordlistSize, setWordlistSize] = useState<number>(1000);
     const [words, setWords] = useState<string[]>([]);
+    const [englishWords, setEnglishWords] = useState<string[]>([]);
     const [keyspaceLength, setKeyspaceLength] = useState(3);
+    const [rulePattern, setRulePattern] = useState<RulePattern>("word-year");
+    const [xkcdVocab, setXkcdVocab] = useState(6);
     const [concurrency, setConcurrency] = useState(1);
 
     const [rateLimit, setRateLimit] = useState(initialConfig.rateLimit);
@@ -84,7 +177,27 @@ export default function PasswordCracker({ usernames, websites, initialConfig }: 
         return () => { cancelled = true; };
     }, [wordlistSize]);
 
-    const total = useMemo(() => estimateTotal(mode, words.length, keyspaceLength), [mode, words.length, keyspaceLength]);
+    // xkcd-style patterns draw from plain English words, not common-password frequency — that's the point of the demo
+    useEffect(() => {
+        if (mode !== "rules" || (rulePattern !== "xkcd4" && rulePattern !== "xkcd4-sep")) return;
+        let cancelled = false;
+        fetch(`/wordlists/english-${wordlistSize}.txt`)
+            .then((r) => (r.ok ? r.text() : ""))
+            .then((text) => {
+                if (!cancelled) setEnglishWords(text.split("\n").filter(Boolean));
+            })
+            .catch(() => {
+                if (!cancelled) setEnglishWords([]);
+            });
+        return () => { cancelled = true; };
+    }, [mode, rulePattern, wordlistSize]);
+
+    const sourceWords = mode === "rules" && (rulePattern === "xkcd4" || rulePattern === "xkcd4-sep") ? englishWords : words;
+
+    const total = useMemo(
+        () => estimateTotal(mode, sourceWords.length, keyspaceLength, rulePattern, xkcdVocab),
+        [mode, sourceWords.length, keyspaceLength, rulePattern, xkcdVocab]
+    );
     const attemptsPerSec = elapsedMs > 0 ? Math.round((attempts / elapsedMs) * 1000) : 0;
     const progressPct = result === "success" ? 100 : Math.min(100, (attempts / total) * 100);
 
@@ -134,7 +247,7 @@ export default function PasswordCracker({ usernames, websites, initialConfig }: 
         stopRef.current = false;
         startRef.current = performance.now();
 
-        const gen = buildGenerator(mode, words, keyspaceLength);
+        const gen = buildGenerator(mode, sourceWords, keyspaceLength, rulePattern, xkcdVocab);
         let count = 0;
         let cracked: string | null = null;
 
@@ -246,12 +359,17 @@ export default function PasswordCracker({ usernames, websites, initialConfig }: 
                             >
                                 <option value="dictionary">Dictionary (common passwords)</option>
                                 <option value="hybrid">Hybrid (dictionary + mutations)</option>
+                                <option value="rules">Rules (patterns like xkcd 936)</option>
                                 <option value="keyspace">Pure brute force (a-z keyspace)</option>
                             </select>
                         </div>
-                        {mode !== "keyspace" && (
+                        {(mode === "dictionary" || mode === "hybrid" || mode === "rules") && (
                             <div className="flex flex-col gap-1">
-                                <label className="text-sm text-muted">Wordlist size ({words.length.toLocaleString()} loaded)</label>
+                                <label className="text-sm text-muted">
+                                    {mode === "rules" && (rulePattern === "xkcd4" || rulePattern === "xkcd4-sep")
+                                        ? `English word list size (${englishWords.length.toLocaleString()} loaded)`
+                                        : `Wordlist size (${words.length.toLocaleString()} loaded)`}
+                                </label>
                                 <select
                                     value={wordlistSize}
                                     onChange={(e) => setWordlistSize(Number(e.target.value))}
@@ -262,6 +380,41 @@ export default function PasswordCracker({ usernames, websites, initialConfig }: 
                                         <option key={n} value={n}>Top {n.toLocaleString()}</option>
                                     ))}
                                 </select>
+                            </div>
+                        )}
+                        {mode === "rules" && (
+                            <div className="flex flex-col gap-1">
+                                <label className="text-sm text-muted">Pattern</label>
+                                <select
+                                    value={rulePattern}
+                                    onChange={(e) => setRulePattern(e.target.value as RulePattern)}
+                                    disabled={running}
+                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-60"
+                                >
+                                    {Object.entries(RULE_LABELS).map(([value, label]) => (
+                                        <option key={value} value={value}>{label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        {mode === "rules" && (rulePattern === "xkcd4" || rulePattern === "xkcd4-sep") && (
+                            <div className="flex flex-col gap-1">
+                                <label className="text-sm text-muted">
+                                    Vocabulary size ({Math.pow(Math.min(words.length, xkcdVocab), 4).toLocaleString()} combinations)
+                                </label>
+                                <input
+                                    type="number"
+                                    min={2}
+                                    max={10}
+                                    value={xkcdVocab}
+                                    onChange={(e) => setXkcdVocab(Number(e.target.value))}
+                                    disabled={running}
+                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-60"
+                                />
+                                <p className="text-xs text-muted">
+                                    A real xkcd-style attack uses a full dictionary (thousands of words). This slider
+                                    keeps the demo&apos;s runtime reasonable — lower it to crack faster on stage.
+                                </p>
                             </div>
                         )}
                         {mode === "keyspace" && (
@@ -320,7 +473,7 @@ export default function PasswordCracker({ usernames, websites, initialConfig }: 
                         {!running ? (
                             <button
                                 onClick={run}
-                                disabled={usernames.length === 0 || websites.length === 0 || (mode !== "keyspace" && words.length === 0)}
+                                disabled={usernames.length === 0 || websites.length === 0 || (mode !== "keyspace" && sourceWords.length === 0)}
                                 className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Run attack

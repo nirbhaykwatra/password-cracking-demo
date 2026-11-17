@@ -74,6 +74,102 @@ const locations = [
     { city: "Springfield", state: "MO", zip: "65806" },
 ];
 
+const firstNames = [
+    "Ava", "Liam", "Noah", "Emma", "Mia", "Lucas", "Zoe", "Ethan", "Chloe", "Owen",
+    "Ella", "Jack", "Nora", "Leo", "Ruby", "Finn", "Ivy", "Theo", "Maya", "Sam",
+];
+
+const lastNames = [
+    "Nguyen", "Patel", "Kim", "Singh", "Chen", "Garcia", "Smith", "Brown", "Wilson", "Lee",
+    "Martin", "Clark", "Young", "Walker", "Hall", "Allen", "King", "Wright", "Scott", "Green",
+];
+
+// Mostly weak passwords that sit in common wordlists, plus a few that don't
+const weakPasswords = [
+    "password", "123456", "qwerty", "letmein", "dragon", "monkey",
+    "sunshine", "iloveyou", "welcome", "football", "baseball", "superman",
+];
+const strongPasswords = ["vK9#mQ2$xL7!", "correct-horse-battery-staple", "T7r!pZ0qWn4e"];
+
+// Base words for the rule-crackable passwords below. Confirmed present in
+// common-100.txt, so these crack at any wordlist size the instructor picks.
+const ruleBaseWords = ["dragon", "monkey", "shadow", "superman"];
+// Top 6 entries of english-*.txt, in order — matches the Rules panel's default
+// vocabulary size for the xkcd-style patterns regardless of list size chosen.
+const xkcdWords = ["the", "and", "for", "that", "this", "with"];
+
+// Mirrors the digit-suffix rule: word + 3 digits (e.g. "dragon482")
+function wordDigitsPassword(rng: () => number): string {
+    const word = pick(ruleBaseWords, rng);
+    const digits = String(Math.floor(rng() * 1000)).padStart(3, "0");
+    return word + digits;
+}
+
+// Mirrors the word-year rule: Capitalized word + birth/grad year (e.g. "Shadow2008")
+function wordYearPassword(rng: () => number): string {
+    const word = pick(ruleBaseWords, rng);
+    const capitalized = word.charAt(0).toUpperCase() + word.slice(1);
+    const year = 1960 + Math.floor(rng() * (2026 - 1960 + 1));
+    return capitalized + year;
+}
+
+const LEET_SUBS: Record<string, string> = { a: "4", e: "3", i: "1", o: "0", s: "5", t: "7" };
+
+// Mirrors the leet-word rule: a random subset of substitutable letters swapped (e.g. "5up3rm4n")
+function leetPassword(rng: () => number): string {
+    const word = pick(ruleBaseWords, rng);
+    return word
+        .split("")
+        .map((ch) => (rng() < 0.6 && LEET_SUBS[ch] ? LEET_SUBS[ch] : ch))
+        .join("");
+}
+
+// Mirrors the xkcd4 / xkcd4-sep rules: 4 words from the default vocabulary slice
+function xkcdPassword(rng: () => number, separator: string): string {
+    return Array.from({ length: 4 }, () => pick(xkcdWords, rng)).join(separator);
+}
+
+// Mirrors Pure Brute Force mode: short enough that iterating the full a-z
+// keyspace finds it quickly once the instructor sets the length slider to match.
+const SHORT_PASSWORD_LENGTH = 4;
+const ALPHABET = "abcdefghijklmnopqrstuvwxyz";
+
+function shortPassword(rng: () => number): string {
+    let out = "";
+    for (let i = 0; i < SHORT_PASSWORD_LENGTH; i++) {
+        out += ALPHABET[Math.floor(rng() * ALPHABET.length)];
+    }
+    return out;
+}
+
+// One entry per attack this demo is built to showcase: a dictionary hit, each
+// rule pattern from the Rules panel, a brute-forceable short password, and an
+// unguessable control password.
+export type PasswordCategory = "weak" | "short" | "word-digits" | "word-year" | "leet-word" | "xkcd4" | "xkcd4-sep" | "strong";
+
+export const PASSWORD_CATEGORIES: PasswordCategory[] = [
+    "weak", "short", "word-digits", "word-year", "leet-word", "xkcd4", "xkcd4-sep", "strong",
+];
+
+function passwordForCategory(category: PasswordCategory, rng: () => number): string {
+    switch (category) {
+        case "weak": return pick(weakPasswords, rng);
+        case "short": return shortPassword(rng);
+        case "word-digits": return wordDigitsPassword(rng);
+        case "word-year": return wordYearPassword(rng);
+        case "leet-word": return leetPassword(rng);
+        case "xkcd4": return xkcdPassword(rng, "");
+        case "xkcd4-sep": return xkcdPassword(rng, "-");
+        case "strong": return pick(strongPasswords, rng);
+    }
+}
+
+export type LeakedCredential = {
+    name: string;
+    email: string;
+    hash: string;
+};
+
 export const getCurrentInstructor = cache(async () => {
     const session = await getSession();
 
@@ -144,7 +240,8 @@ export async function requireDemoUser(sessionCode: string, siteSlug: string) {
 
 export async function getUsersBySession(sessionId: number) {
   return db.query.users.findMany({
-    where: (users, { eq }) => eq(users.sessionId, sessionId)
+    where: (users, { eq }) => eq(users.sessionId, sessionId),
+    with: { site: true }
   });
 }
 
@@ -182,6 +279,12 @@ export async function getOwnedSession(sessionCode: string) {
 export async function getSiteBySlug(slug: string) {
     return db.query.sites.findFirst({
         where: (sites, { eq }) => eq(sites.slug, slug)
+    })
+}
+
+export async function getSiteById(id: number) {
+    return db.query.sites.findFirst({
+        where: (sites, { eq }) => eq(sites.id, id)
     })
 }
 
@@ -248,7 +351,38 @@ export async function generateCreditCard(){
     }
 }
 
-export function generateDemoAddress(userKey: number | string) {
+// Builds a plausible NANP area code: NXX where N is 2-9, the second digit is 0-8,
+// it isn't an N11 service code (e.g. 911), and it avoids the reserved 37X and 96X blocks.
+function generateAreaCode(rng: () => number): string {
+    while (true) {
+        const first = 2 + Math.floor(rng() * 8); // 2-9
+        const second = Math.floor(rng() * 9);    // 0-8
+        const third = Math.floor(rng() * 10);    // 0-9
+
+        const isServiceCode = second === 1 && third === 1;
+        const isReservedBlock = (first === 3 && second === 7) || (first === 9 && second === 6);
+        if (isServiceCode || isReservedBlock) continue;
+
+        return `${first}${second}${third}`;
+    }
+}
+
+export async function generateDemoPhoneNumber(userKey: number | string) {
+    const baseSeed = typeof userKey === "number" ? userKey : hashString(userKey);
+    // Different multiplier from generateDemoAddress so the two aren't correlated
+    const rng = createRng(Math.imul(baseSeed + 1, 2246822519));
+
+    const areaCode = generateAreaCode(rng);
+    // 555-0100 through 555-0199 are reserved for fictional use in every area code
+    const line = String(Math.floor(rng() * 100)).padStart(2, "0");
+
+    return {
+        display: `(${areaCode}) 555-01${line}`,
+        e164: `+1${areaCode}55501${line}`,
+    };
+}
+
+export async function generateDemoAddress(userKey: number | string) {
     const baseSeed = typeof userKey === "number" ? userKey : hashString(userKey);
     // Spread small sequential IDs (1, 2, 3...) across the seed space
     const rng = createRng(Math.imul(baseSeed + 1, 2654435761));
@@ -289,12 +423,42 @@ export const getDemoUsernames = async (sessionCode: string): Promise<DemoUsernam
         .orderBy(asc(min(users.id)));
 };
 
+// Simulates a breach: the email + stored password column for one site in one session.
+// Callers must check ownership first (e.g. requireOwnedSession).
+export const getLeakedCredentials = async (sessionCode: string, siteSlug: string): Promise<LeakedCredential[]> => {
+    const [session, site] = await Promise.all([
+        getSessionByCode(sessionCode),
+        getSiteBySlug(siteSlug),
+    ]);
+    if (!session || !site) return [];
+
+    return db
+        .select({ name: users.name, email: users.email, hash: users.password })
+        .from(users)
+        .where(and(eq(users.sessionId, session.id), eq(users.siteId, site.id)))
+        .orderBy(asc(users.id));
+};
+
 export const getDemoWebsites = async (): Promise<DemoWebsite[]> => {
     return db
         .select({ name: sites.name, slug: sites.slug })
         .from(sites)
         .orderBy(asc(sites.id));
 };
+
+export function rollDemoStudent(category: PasswordCategory) {
+
+    const rng = createRng(Math.imul(Math.random() * 100 + 1, 2654435761));
+    const first = pick(firstNames, rng);
+    const last = pick(lastNames, rng);
+    const suffix = Math.floor(Math.random() * 90) + 10;
+
+    return {
+        name: `${first} ${last}`,
+        email: `${first}.${last}${suffix}@fmail.test`.toLowerCase(),
+        password: passwordForCategory(category, rng),
+    };
+}
 
 const generateFourDigitCode = (): string => {
     const num = Math.floor(Math.random() * 10000);

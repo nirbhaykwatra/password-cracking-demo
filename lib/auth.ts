@@ -1,10 +1,10 @@
 import { db } from '@/db/';
 import {instructors, users} from '@/db/schema';
-import { compare, hash } from 'bcrypt';
+import {compare, genSalt, hash} from 'bcrypt';
 import { cookies } from "next/headers";
 import * as jose from 'jose';
 import { cache } from 'react';
-import { createHash } from 'node:crypto';
+import {createHash, randomInt} from 'node:crypto';
 import {normalizeEmail} from "@/lib/normalize";
 
 // JWT types
@@ -15,6 +15,27 @@ interface JWTPayload {
 
 // Who a token was issued for. A token for one audience is rejected by the other.
 type TokenAudience = 'instructor' | 'student'
+
+export type DemoCreditCard = {
+    number: string
+    exp_month: number
+    exp_year: number
+    cvc: string
+}
+
+export type DemoAddress = {
+    line1: string
+    line2: string | null
+    city: string
+    state: string
+    postal_code: string
+    country: string
+}
+
+export type DemoPhone = {
+    display: string,
+    e164: string,
+}
 
 /* Read lazily so a missing secret doesn't break `next build`, only the first real use. */
 let jwtSecret: Uint8Array | undefined
@@ -57,6 +78,53 @@ export async function verifyPlainTextPassword(password: string, storedPassword: 
     return password === storedPassword;
 }
 
+export type StorageMode = 'plain-text' | 'hashed' | 'salted'
+
+export type PasswordPreview = {
+    mode: StorageMode
+    algorithm: string
+    salt: string | null
+    saltedPassword: string | null // salt + password, before hashing
+    digest: string                // the hash (or the plain text) on its own
+    stored: string                // exactly what would go in the database
+}
+
+const SALT_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789'
+
+// Short random string for the demo. Uses crypto's randomInt so it isn't guessable.
+export function generateSimpleSalt(length = 8): string {
+    let salt = ''
+    for (let i = 0; i < length; i++) {
+        salt += SALT_ALPHABET[randomInt(SALT_ALPHABET.length)]
+    }
+    return salt
+}
+
+// Teaching helper: shows what each storage method would put in the password column.
+export async function previewPasswordStorage(mode: StorageMode, password: string): Promise<PasswordPreview> {
+    switch (mode) {
+        case 'plain-text':
+            return { mode, algorithm: 'None', salt: null, saltedPassword: null, digest: password, stored: password }
+        case 'hashed': {
+            const digest = await md5Hash(password)
+            return { mode, algorithm: 'MD5', salt: null, saltedPassword: null, digest, stored: digest }
+        }
+        case 'salted': {
+            const salt = generateSimpleSalt()
+            const saltedPassword = salt + password
+            const digest = await md5Hash(saltedPassword)
+            return {
+                mode,
+                algorithm: 'MD5 (applied to salt + password)',
+                salt,
+                saltedPassword,
+                digest,
+                stored: `${salt}:${digest}`,
+            }
+        }
+    }
+}
+
 // How each demo site stores and checks passwords. Add a new security stage by adding an entry.
 type PasswordScheme = {
     hash: (password: string) => Promise<string>
@@ -91,22 +159,6 @@ export async function createInstructor(name: string, password: string) {
     return { id:  newInstructor.id, name };
 }
 
-export type DemoCreditCard = {
-    number: string
-    exp_month: number
-    exp_year: number
-    cvc: string
-}
-
-export type DemoAddress = {
-    line1: string
-    line2: string | null
-    city: string
-    state: string
-    postal_code: string
-    country: string
-}
-
 export async function createDemoUser(input: {
     siteSlug: string
     name: string
@@ -116,8 +168,9 @@ export async function createDemoUser(input: {
     siteId: number
     creditCard: DemoCreditCard
     address: DemoAddress
+    phoneNumber: DemoPhone
 }) {
-    const { siteSlug, name, password, sessionId, siteId, creditCard, address } = input
+    const { siteSlug, name, password, sessionId, siteId, creditCard, address, phoneNumber } = input
     const email = normalizeEmail(input.email)
 
     const [newUser] = await db.insert(users).values({
@@ -136,6 +189,7 @@ export async function createDemoUser(input: {
         addressState: address.state,
         addressZip: address.postal_code,
         addressCountry: address.country,
+        phoneNumber: phoneNumber.display
     }).returning({ id: users.id })
 
     return { id: newUser.id, name, email }

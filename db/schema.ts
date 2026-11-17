@@ -63,7 +63,8 @@ export const users = pgTable('users', {
     addressCity: text('address_city').notNull(),
     addressState: text('address_state').notNull(),
     addressZip: text('address_zip').notNull(),
-    addressCountry: text('address_country').notNull()
+    addressCountry: text('address_country').notNull(),
+    phoneNumber: text('phone_number').notNull(),
 }, (table) => [
     unique().on(table.email, table.sessionId, table.siteId),
 ]);

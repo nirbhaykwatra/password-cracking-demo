@@ -247,6 +247,8 @@ function FMailSecurity({ user }: { user: DemoUser }) {
                         <dd>{user.email}</dd>
                         <dt className="text-[#5f6368]">Recovery email</dt>
                         <dd>{user.email}</dd>
+                        <dt className="text-[#5f6368]">Recovery phone number</dt>
+                        <dd>{user.phoneNumber}</dd>
                     </dl>
                 </section>
 

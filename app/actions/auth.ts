@@ -6,10 +6,9 @@ import {
 } from "@/lib/auth";
 import {
     getInstructorByUsername,
-    getDemoUserByEmail,
     getDemoUserBySiteSlug,
     getSiteBySlug,
-    getSessionByCode, generateCreditCard, generateDemoAddress
+    getSessionByCode, generateCreditCard, generateDemoAddress, generateDemoPhoneNumber
 } from "@/lib/dal";
 import { redirect } from "next/navigation";
 
@@ -391,11 +390,13 @@ export const signUpShopZone = async (prevState: ActionResponse | null, formData:
         }
 
         const creditCard = await generateCreditCard();
-        const address = generateDemoAddress(data.email)
+        const address = await generateDemoAddress(data.email)
+        const phoneNumber = await generateDemoPhoneNumber(data.email)
+
 
         const user = await createDemoUser({
                 siteSlug: site.slug, name: fmail.name, email: data.email, password: data.password,
-                sessionId: session.id, siteId: site.id, creditCard, address,
+                sessionId: session.id, siteId: site.id, creditCard, address, phoneNumber
             });
         if (!user){
             return {
@@ -477,11 +478,12 @@ export const signUpFlixWatch = async (prevState: ActionResponse | null, formData
         }
 
         const creditCard = await generateCreditCard();
-        const address = generateDemoAddress(data.email)
+        const address = await generateDemoAddress(data.email)
+        const phoneNumber = await generateDemoPhoneNumber(data.email)
 
         const user = await createDemoUser({
                 siteSlug: site.slug, name: fmail.name, email: data.email, password: data.password,
-                sessionId: session.id, siteId: site.id, creditCard, address,
+                sessionId: session.id, siteId: site.id, creditCard, address, phoneNumber
             });
         if (!user){
             return {
@@ -559,11 +561,12 @@ export const signUpFMail = async (prevState: ActionResponse | null, formData: Fo
         }
 
         const creditCard = await generateCreditCard();
-        const address = generateDemoAddress(email)
+        const address = await generateDemoAddress(email)
+        const phoneNumber = await generateDemoPhoneNumber(email)
 
         const user = await createDemoUser({
                 siteSlug: site.slug, name: username, email, password: data.password,
-                sessionId: session.id, siteId: site.id, creditCard, address,
+                sessionId: session.id, siteId: site.id, creditCard, address, phoneNumber
             });
         if (!user){
             return {

@@ -54,9 +54,9 @@ An instructor's dashboard shows only their active session — its students, thei
 4. They control the active stage from their dashboard — it only affects their session
 
 **Student flow:**
-1. Students go to `/join` and enter the join code
-2. The join code is stored in their browser (a cookie or session storage)
-3. They go to `/signup` — the sign-up form uses the join code to look up the session and its active stage
+1. Students go to `/` and enter the join code
+2. Student dashboard with the demo website cards
+3. They go to `${sessionCode}/${siteSlug}/signup` — the sign-up form uses the join code to look up the session and its active stage
 4. Their user account is created scoped to that session
 
 

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import {getInstructionSessionsByUserId, getCurrentInstructor, getUsersBySession} from "@/lib/dal";
-import {NewSessionButton, RefreshButton} from "@/components/dashboard/DashboardClientComponents";
+import {
+    NewSessionButton,
+    RefreshButton,
+    RollDemoAccountsButton
+} from "@/components/dashboard/DashboardClientComponents";
 
 export type  Session = {
     id: number;
@@ -72,43 +76,92 @@ export async function SessionDatabaseView({ session }:  { session: Session }) {
         <div className="flex flex-col gap-4 rounded-2xl border border-foreground-10 bg-primary-foreground p-6 shadow-sm my-4">
             <div className="flex flex-row justify-between">
                 <h2 className="text-lg font-bold text-primary">Database</h2>
-                <RefreshButton />
+                <div className="flex items-center gap-3">
+                    <RollDemoAccountsButton sessionCode={session.code} />
+                    <RefreshButton />
+                </div>
             </div>
             <div className="h-px w-full" />
 
             { users.length > 0 ?
-                <table>
-                    <thead className="text-left">
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Password</th>
-                        <th>Site ID</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {users.map((session) => (
-                        <tr key={session.id}>
-                            <td>
-                                {session.id}
-                            </td>
-                            <td>
-                                {session.name}
-                            </td>
-                             <td>
-                                {session.email}
-                            </td>
-                            <td>
-                                {session.password}
-                            </td>
-                            <td>
-                                {session.siteId}
-                            </td>
+                <div className="w-full overflow-x-auto">
+                    <table className="min-w-full whitespace-nowrap [&_th]:px-4 [&_td]:px-4 [&_th]:py-2 [&_td]:py-2">
+                        <thead className="text-left">
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Password</th>
+                            <th>Website</th>
+                            <th>Credit Card Number</th>
+                            <th>Card Expiry Month</th>
+                            <th>Card Expiry Year</th>
+                            <th>Card CVC</th>
+                            <th>Address Line 1</th>
+                            <th>Address Line 2</th>
+                            <th>City</th>
+                            <th>State</th>
+                            <th>Postal Code</th>
+                            <th>Country</th>
+                            <th>Phone Number</th>
                         </tr>
-                    ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        {users.map((session) => (
+                            <tr key={session.id}>
+                                <td>
+                                    {session.id}
+                                </td>
+                                <td>
+                                    {session.name}
+                                </td>
+                                 <td>
+                                    {session.email}
+                                </td>
+                                <td>
+                                    {session.password}
+                                </td>
+                                <td>
+                                    {session.site.slug}
+                                </td>
+                                <td>
+                                    {session.creditCard}
+                                </td>
+                                <td>
+                                    {session.cardExpMonth}
+                                </td>
+                                <td>
+                                    {session.cardExpYear}
+                                </td>
+                                <td>
+                                    {session.cardCvc}
+                                </td>
+                                <td>
+                                    {session.addressLine1}
+                                </td>
+                                <td>
+                                    {session.addressLine2}
+                                </td>
+                                <td>
+                                    {session.addressCity}
+                                </td>
+                                <td>
+                                    {session.addressState}
+                                </td>
+                                <td>
+                                    {session.addressZip}
+                                </td>
+                                <td>
+                                    {session.addressCountry}
+                                </td>
+                                <td>
+                                    {session.phoneNumber}
+                                </td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
                 :
                 <p className="text-sm text-primary text-center py-8">
                     No users created.

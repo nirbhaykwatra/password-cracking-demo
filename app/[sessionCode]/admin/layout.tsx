@@ -22,7 +22,7 @@ export default function SessionAdminLayout({ children, params }: { children: Rea
                 </div>
 
                 {/* Scrollable content */}
-                <div className="flex flex-1 flex-col min-h-0">
+                <div className="flex flex-1 min-w-0 flex-col min-h-0">
                     <main className="flex-1 overflow-y-auto px-6 py-12 sm:px-10">
                         <div className="flex flex-col gap-8 mx-auto w-full">
                             <Suspense fallback={<p />}>
