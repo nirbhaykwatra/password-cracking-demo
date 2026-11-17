@@ -99,3 +99,8 @@ users
   siteId    → sites.id
   unique(email, siteId, sessionId)
 ```
+
+# TODO
+- Optimize guesses/sec speed for fast attacks
+- Introduce a toggle on the password cracker which switches between the current guessing speed, batched endpoints and
+  local processing to show the difference between network attempts and local password cracking.
