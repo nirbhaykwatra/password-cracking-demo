@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "build:wordlist": "tsx scripts/build-wordlist.ts",
-    "build:english-wordlist": "tsx scripts/build-english-wordlist.ts"
+    "build:english-wordlist": "tsx scripts/build-english-wordlist.ts",
+    "generate:instructors": "tsx --env-file=.env scripts/generate-instructors.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
