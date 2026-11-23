@@ -16,6 +16,8 @@ services:
       target: builder
     env_file: .env.production
     profiles: [ "tools" ]
+    volumes:
+      - ./credentials:/app/credentials
     depends_on:
       db:
         condition: service_healthy
